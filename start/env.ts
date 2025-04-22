@@ -18,6 +18,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   APP_URL: Env.schema.string(),
   HOST: Env.schema.string({ format: 'host' }),
   LOG_LEVEL: Env.schema.string(),
+  OPENAI_API_KEY: Env.schema.string(),
 
   /*
   |----------------------------------------------------------
@@ -44,4 +45,20 @@ export default await Env.create(new URL('../', import.meta.url), {
   */
   GOOGLE_CLIENT_ID: Env.schema.string(),
   GOOGLE_CLIENT_SECRET: Env.schema.string(),
+
+  /*
+  |----------------------------------------------------------
+  | Variables for configuring the drive package
+  |----------------------------------------------------------
+  */
+  DRIVE_DISK: Env.schema.enum(['fs'] as const),
+
+  /*
+  |----------------------------------------------------------
+  | Variables for @rlanz/bull-queue
+  |----------------------------------------------------------
+  */
+  QUEUE_REDIS_HOST: Env.schema.string({ format: 'host' }),
+  QUEUE_REDIS_PORT: Env.schema.number(),
+  QUEUE_REDIS_PASSWORD: Env.schema.string.optional(),
 })

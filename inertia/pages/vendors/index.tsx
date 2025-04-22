@@ -1,9 +1,10 @@
 import DefaultLayout from '~/app/layouts/default-layout'
+import HeaderPage from '~/components/header-page'
 
 const Fournisseurs = () => {
   return (
     <DefaultLayout>
-      <h1>Fournisseurs</h1>
+      <HeaderPage title="Fournisseurs" />
     </DefaultLayout>
   )
 }

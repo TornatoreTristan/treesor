@@ -1,5 +1,7 @@
 import { Head } from '@inertiajs/react'
 import DefaultLayout from '~/app/layouts/default-layout'
+import HeaderPage from '~/components/header-page'
+import Dashboard from './components/dashboard'
 
 export default function Home() {
   return (
@@ -7,7 +9,10 @@ export default function Home() {
       <DefaultLayout>
         <Head title="Homepage" />
         <div>
-          <h1>Tableau de bord</h1>
+          <HeaderPage title="Tableau de bord" />
+          <div className="mt-8">
+            <Dashboard />
+          </div>
         </div>
       </DefaultLayout>
     </>

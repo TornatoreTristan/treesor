@@ -1,4 +1,4 @@
-import { BookUser, Files, LayoutDashboard } from 'lucide-react'
+import { BookUser, CircleDollarSign, Files, LayoutDashboard, LayoutList } from 'lucide-react'
 import {
   SidebarContent,
   SidebarGroup,
@@ -17,9 +17,19 @@ const items = [
     icon: LayoutDashboard,
   },
   {
+    title: 'Transactions',
+    url: '/transactions',
+    icon: CircleDollarSign,
+  },
+  {
     title: 'Documents',
     url: '/drive',
     icon: Files,
+  },
+  {
+    title: 'Catégories',
+    url: '/categories',
+    icon: LayoutList,
   },
   {
     title: 'Fournisseurs',

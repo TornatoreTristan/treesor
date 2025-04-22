@@ -32,8 +32,8 @@ export class AuthGoogleService {
       })
     }
 
-    // Connecter l'utilisateur en utilisant la session
-    await ctx.session.put('auth_user_id', user.id)
+    // Connexion de l'utilisateur avec le service de session
+    await ctx.auth.use('web').login(user)
 
     // Rediriger vers le dashboard
     return ctx.response.redirect('/')
