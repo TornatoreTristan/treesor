@@ -7,13 +7,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Installation des dépendances
-RUN npm ci --production=false
+RUN npm ci
 
 # Copie du reste du code source
 COPY . .
 
 # Build de l’application (si tu utilises TypeScript)
-RUN npm run build
+RUN if [ -f tsconfig.json ]; then npm run build; fi
 
 # Étape 2 : Production
 FROM node:20-alpine
@@ -21,7 +21,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copie uniquement les fichiers nécessaires depuis l’étape de build
-COPY --from=build /app/build ./build
+COPY --from=build /app ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/.env ./
@@ -30,4 +30,4 @@ COPY --from=build /app/.env ./
 EXPOSE 3333
 
 # Commande de lancement
-CMD ["node", "build/server.js"]
+CMD [ "node", "build/server.js" ]
