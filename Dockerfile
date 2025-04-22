@@ -5,7 +5,6 @@ WORKDIR /app
 
 # Copie des fichiers nécessaires pour installer les dépendances
 COPY package*.json ./
-COPY .npmrc .npmrc
 
 # Installation des dépendances
 RUN npm ci --production=false
