@@ -30,7 +30,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=build /app/build ./build
-COPY --from=build /app/public ./public
+COPY --from=build /app/build/public ./public
 # Si tu as un .env.production, décommente la ligne suivante :
 # COPY .env.production .env
 COPY .env .env
