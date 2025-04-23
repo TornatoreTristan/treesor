@@ -30,4 +30,4 @@ COPY --from=build /app/.env ./
 EXPOSE 3333
 
 # Commande de lancement
-CMD [ "node", "build/server.js" ]
+CMD [ "node", "bin/server.js" ]
