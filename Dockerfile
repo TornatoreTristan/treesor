@@ -1,8 +1,8 @@
-# Étape 1 : Dépendances
+# Étape 1 : Dépendances (prod + dev)
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Étape 2 : Build
 FROM node:20-alpine AS build
@@ -12,7 +12,6 @@ COPY . .
 # Si tu as un .env.production, décommente la ligne suivante :
 # COPY .env.production .env
 RUN npm run build || node ace build --ignore-ts-errors
-RUN rm -rf node_modules
 
 # Étape 3 : Production
 FROM node:20-alpine AS production
@@ -21,7 +20,10 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 
-COPY --from=deps /app/node_modules ./node_modules
+# On réinstalle les dépendances de prod uniquement
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 COPY --from=build /app/build ./build
 # Si tu as un .env.production, décommente la ligne suivante :
 # COPY .env.production .env
@@ -30,6 +32,6 @@ COPY .env .env
 EXPOSE 3000
 
 # Point d'entrée AdonisJS 6 (TypeScript)
-CMD ["node", "./bin/server.js"]
+CMD ["node", "build/server.js"]
 # Si tu as build/start/server.js, adapte :
 # CMD ["node", "build/start/server.js"]
