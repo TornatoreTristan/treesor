@@ -27,7 +27,7 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/.env ./
 
 # Expose le port par défaut d’AdonisJS
-EXPOSE 3333
+EXPOSE 3000
 
 # Commande de lancement
 CMD [ "node", "bin/server.js" ]
