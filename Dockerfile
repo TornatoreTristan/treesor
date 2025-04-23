@@ -1,33 +1,35 @@
-# Étape 1 : Build
-FROM node:20-alpine AS build
-
+# Étape 1 : Dépendances
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# Copie des fichiers nécessaires pour installer les dépendances
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Installation des dépendances
-RUN npm ci
-
-# Copie du reste du code source
-COPY . .
-
-# Build de l’application (si tu utilises TypeScript)
-RUN if [ -f tsconfig.json ]; then npm run build; fi
-
-# Étape 2 : Production
-FROM node:20-alpine
-
+# Étape 2 : Build
+FROM node:20-alpine AS build
 WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# Si tu as un .env.production, décommente la ligne suivante :
+# COPY .env.production .env
+RUN npm run build || node ace build --ignore-ts-errors
+RUN rm -rf node_modules
 
-# Copie uniquement les fichiers nécessaires depuis l’étape de build
-COPY --from=build /app ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/.env ./
+# Étape 3 : Production
+FROM node:20-alpine AS production
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
 
-# Expose le port par défaut d’AdonisJS
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+# Si tu as un .env.production, décommente la ligne suivante :
+# COPY .env.production .env
+COPY .env .env
+
 EXPOSE 3000
 
-# Commande de lancement
-CMD [ "node", "bin/server.js" ]
+# Point d'entrée AdonisJS 6 (TypeScript)
+CMD ["node", "./bin/server.js"]
+# Si tu as build/start/server.js, adapte :
+# CMD ["node", "build/start/server.js"]
