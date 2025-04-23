@@ -1,17 +1,17 @@
 // Routes qui gèrent la navigation sur le site
-import './routes/navigation.js'
+import './routes/navigation'
 
 // Routes qui gèrent l'authentification
-import './routes/auth.js'
+import './routes/auth'
 
 // Routes qui gèrent le drive et l'upload de documents
-import './routes/drive.ts'
+import './routes/drive'
 
 // Routes pour les catégories
-import './routes/categories.ts'
+import './routes/categories'
 
 // Routes pour les transactions
-import './routes/transactions.ts'
+import './routes/transactions'
 
 // Routes pour les api
-import './routes/api.ts'
+import './routes/api'
