@@ -32,6 +32,6 @@ COPY .env .env
 EXPOSE 3000
 
 # Point d'entrée AdonisJS 6 (TypeScript)
-CMD ["node", "build/server.js"]
+CMD ["node", "./bin/server.js"]
 # Si tu as build/start/server.js, adapte :
 # CMD ["node", "build/start/server.js"]
