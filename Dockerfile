@@ -13,11 +13,6 @@ COPY . .
 # COPY .env.production .env
 RUN npm run build || node ace build --ignore-ts-errors
 
-RUN npm run build
-
-# Build frontend (Vite)
-RUN npm run build
-
 # Étape 3 : Production
 FROM node:20-alpine AS production
 WORKDIR /app
