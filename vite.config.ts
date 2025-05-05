@@ -22,4 +22,11 @@ export default defineConfig({
       '~/': `${getDirname(import.meta.url)}/inertia/`,
     },
   },
+
+  /**
+   * Configuration du serveur pour autoriser les hôtes externes comme ngrok
+   */
+  server: {
+    allowedHosts: ['localhost', 'fb47-24-48-7-240.ngrok-free.app'],
+  },
 })

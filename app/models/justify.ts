@@ -29,9 +29,6 @@ export default class Justify extends BaseModel {
   @column()
   declare type: string
 
-  @column()
-  declare transactionId: number | null
-
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -43,9 +40,6 @@ export default class Justify extends BaseModel {
 
   @belongsTo(() => User, { foreignKey: 'assignId' })
   declare assignedTo: BelongsTo<typeof User>
-
-  @belongsTo(() => Transaction, { foreignKey: 'transactionId' })
-  declare transaction: BelongsTo<typeof Transaction>
 
   @manyToMany(() => Transaction, {
     pivotTable: 'transaction_justificatif',

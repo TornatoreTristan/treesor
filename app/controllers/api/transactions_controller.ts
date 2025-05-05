@@ -2,6 +2,10 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Transaction from '#models/transaction'
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
+import { CreateTransactionUseCase } from '../../domain/transactions/use_cases/create_transaction_use_case.js'
+import { TransactionRepository } from '../../infrastructure/repositories/transaction_repository.js'
+import { createTransactionValidator } from '../../validators/transaction_validator.js'
+import TransactionAICategorizer from '../../services/transaction_ai_categorizer.js'
 
 export default class TransactionsController {
   // Liste des transactions avec pagination
@@ -130,5 +134,94 @@ export default class TransactionsController {
       },
       data: formattedData,
     })
+  }
+
+  // Méthode pour créer une nouvelle transaction
+  async create({ request, response }: HttpContext) {
+    try {
+      // Valider les données d'entrée
+      const payload = await request.validateUsing(createTransactionValidator)
+
+      // Initialiser le repository et le use case
+      const transactionRepository = new TransactionRepository()
+      const createTransactionUseCase = new CreateTransactionUseCase(transactionRepository)
+
+      // 1. Créer la transaction
+      const createdTransaction = await createTransactionUseCase.execute(payload)
+
+      // 2. Tentative de catégorisation automatique si aucune catégorie n'est spécifiée
+      let categorized = false
+      if (!payload.categoryId && createdTransaction.id) {
+        try {
+          // Récupérer la transaction créée pour la compléter
+          const transaction = await Transaction.findOrFail(createdTransaction.id)
+
+          // Utiliser le service de catégorisation automatique
+          const suggestedCategory = await TransactionAICategorizer.suggestCategory(
+            transaction.description,
+            transaction.type
+          )
+
+          if (suggestedCategory) {
+            transaction.categoryId = suggestedCategory.id
+            await transaction.save()
+            categorized = true
+
+            // Mettre à jour l'entité retournée
+            createdTransaction.categoryId = suggestedCategory.id
+          }
+        } catch (categorizationError) {
+          console.error('Erreur lors de la catégorisation automatique:', categorizationError)
+          // On continue même si la catégorisation échoue
+        }
+      }
+
+      // Retourner la transaction créée avec un statut 201 (Created)
+      return response.status(201).json({
+        success: true,
+        data: createdTransaction,
+        autoCategorized: categorized,
+      })
+    } catch (error) {
+      // Gérer les erreurs de validation spécifiquement
+      if (error.messages) {
+        return response.status(422).json({
+          success: false,
+          errors: error.messages,
+        })
+      }
+
+      // Gérer les autres erreurs
+      return response.status(400).json({
+        success: false,
+        message: error.message || 'Une erreur est survenue lors de la création de la transaction',
+      })
+    }
+  }
+
+  /**
+   * Catégoriser automatiquement une ou plusieurs transactions
+   */
+  async autoCategorize({ request, response }: HttpContext) {
+    try {
+      // Récupérer les IDs des transactions à catégoriser (optionnel)
+      const transactionIds = request.input('transactionIds', [])
+
+      // Exécuter la catégorisation automatique
+      const result = await TransactionAICategorizer.bulkCategorize(
+        Array.isArray(transactionIds) && transactionIds.length > 0 ? transactionIds : undefined
+      )
+
+      return response.json({
+        success: true,
+        results: result,
+      })
+    } catch (error) {
+      console.error("Erreur lors de l'auto-catégorisation:", error)
+      return response.status(500).json({
+        success: false,
+        message: error.message || 'Une erreur est survenue lors de la catégorisation automatique',
+      })
+    }
   }
 }

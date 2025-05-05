@@ -3,6 +3,7 @@ import { BaseModel, column, belongsTo, manyToMany } from '@adonisjs/lucid/orm'
 import Categorie from '#models/categorie'
 import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
 import Justify from './justify.js'
+import Invoice from './invoice.js'
 
 export default class Transaction extends BaseModel {
   @column({ isPrimary: true })
@@ -56,6 +57,12 @@ export default class Transaction extends BaseModel {
   @column()
   declare accountNumber: string | null
 
+  @column()
+  declare invoiceId: number | null
+
+  @column()
+  declare justificatifId: number | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -66,6 +73,16 @@ export default class Transaction extends BaseModel {
     foreignKey: 'categoryId',
   })
   declare category: BelongsTo<typeof Categorie>
+
+  @belongsTo(() => Justify, {
+    foreignKey: 'justificatifId',
+  })
+  declare justificatif: BelongsTo<typeof Justify>
+
+  @belongsTo(() => Invoice, {
+    foreignKey: 'invoiceId',
+  })
+  declare invoice: BelongsTo<typeof Invoice>
 
   @manyToMany(() => Justify, {
     pivotTable: 'transaction_justificatif',

@@ -5,7 +5,16 @@
     "rootDir": "./",
     "outDir": "./build",
     "paths": {
-      "~/*": ["./inertia/*"]
+      "~/*": ["./inertia/*"],
+      "#domain/*": ["./app/domain/*"],
+      "#controllers/*": ["./app/controllers/*"],
+      "#models/*": ["./app/models/*"],
+      "#start/*": ["./start/*"],
+      "#exceptions/*": ["./app/exceptions/*"],
+      "#entities/*": ["./app/domain/invoices/entities/*"],
+      "#middleware/*": ["./app/middleware/*"],
+      "#validators/*": ["./app/validators/*"],
+      "#services/*": ["./app/services/*"]
     }
   },
   "exclude": ["./inertia/**/*", "node_modules", "build"]

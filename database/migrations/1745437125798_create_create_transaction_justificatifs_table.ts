@@ -6,6 +6,8 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
+
+      // Clé étrangère vers transactions
       table
         .integer('transaction_id')
         .unsigned()
@@ -13,6 +15,8 @@ export default class extends BaseSchema {
         .references('id')
         .inTable('transactions')
         .onDelete('CASCADE')
+
+      // Clé étrangère vers justificatifs
       table
         .integer('justificatif_id')
         .unsigned()
@@ -20,8 +24,11 @@ export default class extends BaseSchema {
         .references('id')
         .inTable('justificatifs')
         .onDelete('CASCADE')
+
+      // Unicité pour éviter les doublons
       table.unique(['transaction_id', 'justificatif_id'])
-      table.timestamp('created_at').defaultTo(this.now())
+
+      table.timestamp('created_at')
     })
   }
 

@@ -1,4 +1,12 @@
-import { BookUser, CircleDollarSign, Files, LayoutDashboard, LayoutList } from 'lucide-react'
+import {
+  BookUser,
+  CircleDollarSign,
+  Files,
+  LayoutDashboard,
+  LayoutList,
+  ReceiptEuro,
+  ReceiptText,
+} from 'lucide-react'
 import {
   SidebarContent,
   SidebarGroup,
@@ -30,6 +38,16 @@ const items = [
     title: 'Catégories',
     url: '/categories',
     icon: LayoutList,
+  },
+  {
+    title: 'Factures',
+    url: '/invoices',
+    icon: ReceiptEuro,
+  },
+  {
+    title: 'Justificatifs',
+    url: '/justificatifs',
+    icon: ReceiptText,
   },
   {
     title: 'Fournisseurs',
