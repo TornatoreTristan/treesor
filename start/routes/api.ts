@@ -9,6 +9,7 @@ router
   .group(() => {
     router.get('/transactions/dashboard', [ApiTransactionsController, 'dashboard'])
     router.get('/transactions/cashflow', [ApiTransactionsController, 'cashflowByMonth'])
+    router.get('/transactions/category-totals', [ApiTransactionsController, 'categoryTotals'])
     router.post('/transactions/create', [ApiTransactionsController, 'create'])
     router.post('/transactions/auto-categorize', [ApiTransactionsController, 'autoCategorize'])
   })

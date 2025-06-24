@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useCashFlowData } from '~/hooks/use_cashflow'
+import { useDateRange } from '~/contexts/daterange-context'
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -22,7 +23,12 @@ const formatCurrency = (amount: number) => {
 
 const CashFlowChart = () => {
   const [monthsToShow, setMonthsToShow] = useState(12)
-  const { data, isLoading, error } = useCashFlowData({ months: monthsToShow })
+  const { dateRange } = useDateRange()
+  const { data, isLoading, error } = useCashFlowData({
+    months: monthsToShow,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  })
 
   const handleMonthsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setMonthsToShow(Number(e.target.value))

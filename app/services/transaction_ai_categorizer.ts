@@ -4,6 +4,12 @@ import Transaction from '#models/transaction'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+interface SimilarTransaction {
+  transaction: Transaction
+  similarity: number
+  matchedKeywords: string[]
+}
+
 export default class TransactionAICategorizer {
   /**
    * Suggère une catégorie pour une transaction en se basant sur sa description et son type
@@ -16,70 +22,60 @@ export default class TransactionAICategorizer {
     const categories = await Categorie.query().select('id', 'name')
     const categoryNames = categories.map((c) => c.name)
 
-    // Avant d'utiliser l'IA, vérifions s'il existe des transactions similaires déjà catégorisées
-    const similarTransaction = await this.findSimilarTransaction(description, type)
+    // Recherche de transactions similaires avec un système de scoring amélioré
+    const similarTransactions = await this.findSimilarTransactions(description, type, 5)
 
-    if (similarTransaction && similarTransaction.categoryId) {
-      // Une transaction similaire a été trouvée avec une catégorie!
-      console.log('Catégorie trouvée par similarité:', similarTransaction.category?.name)
-      return similarTransaction.category || null
+    // Si on trouve des transactions très similaires, utilise la catégorie la plus fréquente
+    if (similarTransactions.length > 0) {
+      const bestMatch = this.selectBestCategoryFromHistory(similarTransactions)
+      if (bestMatch.confidence > 0.8) {
+        console.log(
+          `Catégorie trouvée par similarité (${bestMatch.confidence.toFixed(2)}):`,
+          bestMatch.category?.name
+        )
+        console.log(`Mots-clés matchés: ${bestMatch.matchedKeywords.join(', ')}`)
+        return bestMatch.category || null
+      }
     }
 
-    // Récupère plusieurs exemples récents de transactions déjà catégorisées pour l'apprentissage
-    const examples = await Transaction.query()
-      .whereNotNull('categoryId')
-      .preload('category')
-      .orderBy('created_at', 'desc')
-      .limit(10)
+    // Construit un contexte riche pour l'IA en utilisant l'historique de transactions similaires
+    const contextualExamples = await this.buildContextualExamples(
+      description,
+      type,
+      similarTransactions
+    )
 
-    const exampleLines = examples
-      .filter((tx) => tx.category)
-      .map((tx) => `"${tx.description}" (${tx.type}) -> ${tx.category.name}`)
-      .join('\n')
-
-    // Prépare le prompt avec contexte et règles métier
-    const prompt = `Voici la liste des catégories existantes : ${categoryNames.join(', ')}.
-Type de la transaction : ${type === 'credit' ? 'crédit' : 'débit'}
-Voici des exemples récents de classification :
-${exampleLines}
-
-Règles métier importantes :
-- N'attribue jamais la catégorie "Ventes" à une transaction de type "débit".
-- N'attribue jamais la catégorie "Achat" à une transaction de type "crédit".
-- Si tu vois "RIT" ou "virement" dans le libellé d'un crédit, c'est probablement une vente.
-- Les mots clés comme "LOYER", "ASSURANCE", "TELECOM" sont importants pour la classification.
-- Cherche des mots-clés pertinents dans la description.
-
-À partir de ces exemples et règles, à quelle catégorie EXACTE (nom dans la liste) appartient la transaction suivante ? "${description}"
-Donne uniquement le nom EXACT d'une catégorie existante, sans rien ajouter d'autre.`
+    // Prépare le prompt enrichi avec le contexte d'historique
+    const prompt = this.buildEnhancedPrompt(
+      description,
+      type,
+      categoryNames,
+      contextualExamples,
+      similarTransactions
+    )
 
     try {
-      // Appel à l'API OpenAI (format chat)
+      // Appel à l'API OpenAI avec un contexte enrichi
       const res = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
             content:
-              'Tu es un assistant financier expert qui classe les transactions bancaires dans la bonne catégorie avec précision.',
+              "Tu es un assistant financier expert qui classe les transactions bancaires en utilisant l'historique des transactions similaires pour faire des choix cohérents et précis.",
           },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 20,
-        temperature: 0.3, // Un peu de diversité peut aider à trouver la bonne catégorie
+        max_tokens: 30,
+        temperature: 0.1, // Plus déterministe avec l'historique
       })
 
       const suggestion = res.choices[0].message?.content?.trim()
       if (!suggestion) return null
 
       console.log('Suggestion IA:', suggestion)
-      console.log(
-        'Catégories existantes:',
-        categories.map((c) => c.name)
-      )
 
       // Trouve la catégorie correspondante avec un matching plus précis
-      // D'abord essayer une correspondance exacte, puis une correspondance partielle
       let found = categories.find((c) => c.name.toLowerCase() === suggestion.toLowerCase())
 
       if (!found) {
@@ -101,52 +97,303 @@ Donne uniquement le nom EXACT d'une catégorie existante, sans rien ajouter d'au
   }
 
   /**
-   * Trouve une transaction similaire déjà catégorisée
+   * Trouve plusieurs transactions similaires avec un scoring de similarité
    */
-  static async findSimilarTransaction(
+  static async findSimilarTransactions(
     description: string,
-    type: 'credit' | 'debit'
-  ): Promise<Transaction | null> {
-    // Normalisation de la description pour la recherche
+    type: 'credit' | 'debit',
+    limit: number = 5
+  ): Promise<SimilarTransaction[]> {
+    // Normalisation et extraction des mots-clés
+    const keywords = this.extractKeywords(description)
+    if (keywords.length === 0) return []
+
+    try {
+      // Récupère un large échantillon de transactions déjà catégorisées du même type
+      const candidateTransactions = await Transaction.query()
+        .where('type', type)
+        .whereNotNull('categoryId')
+        .preload('category')
+        .orderBy('created_at', 'desc')
+        .limit(200) // Plus large échantillon pour meilleure analyse
+
+      const similarTransactions: SimilarTransaction[] = []
+
+      // Évalue la similarité pour chaque transaction candidate
+      for (const transaction of candidateTransactions) {
+        const similarity = this.calculateSimilarity(keywords, transaction.description)
+
+        if (similarity.score > 0.3) {
+          // Seuil de similarité minimum
+          similarTransactions.push({
+            transaction,
+            similarity: similarity.score,
+            matchedKeywords: similarity.matchedKeywords,
+          })
+        }
+      }
+
+      // Trie par score de similarité décroissant et retourne les meilleures
+      return similarTransactions.sort((a, b) => b.similarity - a.similarity).slice(0, limit)
+    } catch (error) {
+      console.error('Erreur lors de la recherche de transactions similaires:', error)
+      return []
+    }
+  }
+
+  /**
+   * Extrait les mots-clés pertinents d'une description
+   */
+  static extractKeywords(description: string): string[] {
     const normalizedDesc = description.toLowerCase().trim()
 
-    // Extraction des mots clés importants (enlève les articles, nombres, etc.)
-    const keyWords = normalizedDesc
-      .split(/\s+/)
-      .filter((word) => word.length > 3) // Mots significatifs seulement
+    // Liste des mots vides à ignorer
+    const stopWords = new Set([
+      'le',
+      'la',
+      'les',
+      'un',
+      'une',
+      'des',
+      'du',
+      'de',
+      'et',
+      'ou',
+      'à',
+      'au',
+      'aux',
+      'pour',
+      'par',
+      'sur',
+      'dans',
+      'avec',
+      'sans',
+      'sous',
+      'vers',
+      'chez',
+      'depuis',
+      'pendant',
+      'avant',
+      'après',
+      'entre',
+      'parmi',
+      'selon',
+      'malgré',
+      'car',
+      'donc',
+      'mais',
+      'cependant',
+      'toutefois',
+      'néanmoins',
+      'pourtant',
+    ])
+
+    return normalizedDesc
+      .split(/[\s\-_.,;:!?()[\]{}'"]+/) // Split sur plus de délimiteurs
+      .filter((word) => word.length >= 3) // Mots d'au moins 3 caractères
+      .filter((word) => !stopWords.has(word)) // Enlève les mots vides
+      .filter((word) => !/^\d+$/.test(word)) // Enlève les nombres purs
       .map((word) =>
         word.replace(
           /[^a-z0-9àáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆŠŽ∂ð]/gi,
           ''
         )
       )
-      .filter((word) => word.length > 2) // Après nettoyage, garde que les mots significatifs
+      .filter((word) => word.length >= 2) // Re-filtre après nettoyage
+  }
 
-    if (keyWords.length === 0) return null
+  /**
+   * Calcule un score de similarité entre les mots-clés et une description
+   */
+  static calculateSimilarity(
+    keywords: string[],
+    targetDescription: string
+  ): {
+    score: number
+    matchedKeywords: string[]
+  } {
+    const targetKeywords = this.extractKeywords(targetDescription)
+    const targetSet = new Set(targetKeywords)
 
-    // Construction de la requête pour chercher des transactions similaires
-    try {
-      // Chercher des transactions déjà catégorisées avec des mots clés similaires
-      const query = Transaction.query()
+    const matchedKeywords: string[] = []
+    let exactMatches = 0
+    let partialMatches = 0
+
+    for (const keyword of keywords) {
+      // Correspondance exacte
+      if (targetSet.has(keyword)) {
+        exactMatches++
+        matchedKeywords.push(keyword)
+      } else {
+        // Correspondance partielle (inclusion)
+        const partialMatch = targetKeywords.find(
+          (tk) => tk.includes(keyword) || keyword.includes(tk)
+        )
+        if (partialMatch) {
+          partialMatches++
+          matchedKeywords.push(`${keyword}~${partialMatch}`)
+        }
+      }
+    }
+
+    // Score pondéré : correspondances exactes valent plus que partielles
+    const score = (exactMatches * 1.0 + partialMatches * 0.5) / keywords.length
+
+    return {
+      score,
+      matchedKeywords,
+    }
+  }
+
+  /**
+   * Sélectionne la meilleure catégorie basée sur l'historique des transactions similaires
+   */
+  static selectBestCategoryFromHistory(similarTransactions: SimilarTransaction[]): {
+    category: Categorie | null
+    confidence: number
+    matchedKeywords: string[]
+  } {
+    if (similarTransactions.length === 0) {
+      return { category: null, confidence: 0, matchedKeywords: [] }
+    }
+
+    // Groupe par catégorie et calcule un score pondéré
+    const categoryScores = new Map<
+      number,
+      {
+        category: Categorie
+        totalScore: number
+        count: number
+        keywords: Set<string>
+      }
+    >()
+
+    for (const similar of similarTransactions) {
+      const categoryId = similar.transaction.categoryId!
+      const category = similar.transaction.category!
+
+      if (!categoryScores.has(categoryId)) {
+        categoryScores.set(categoryId, {
+          category,
+          totalScore: 0,
+          count: 0,
+          keywords: new Set(),
+        })
+      }
+
+      const categoryData = categoryScores.get(categoryId)!
+      categoryData.totalScore += similar.similarity
+      categoryData.count += 1
+      similar.matchedKeywords.forEach((k) => categoryData.keywords.add(k))
+    }
+
+    // Trouve la catégorie avec le meilleur score moyen
+    let bestCategory = null
+    let bestScore = 0
+    let bestKeywords: string[] = []
+
+    for (const [categoryId, data] of categoryScores) {
+      const averageScore = data.totalScore / data.count
+      const confidence = averageScore * Math.min(data.count / 3, 1) // Bonus pour plusieurs occurrences
+
+      if (confidence > bestScore) {
+        bestScore = confidence
+        bestCategory = data.category
+        bestKeywords = Array.from(data.keywords)
+      }
+    }
+
+    return {
+      category: bestCategory,
+      confidence: bestScore,
+      matchedKeywords: bestKeywords,
+    }
+  }
+
+  /**
+   * Construit des exemples contextuels pour l'IA
+   */
+  static async buildContextualExamples(
+    description: string,
+    type: 'credit' | 'debit',
+    similarTransactions: SimilarTransaction[]
+  ): Promise<string[]> {
+    const examples: string[] = []
+
+    // Ajoute les transactions similaires comme exemples prioritaires
+    for (const similar of similarTransactions.slice(0, 5)) {
+      const tx = similar.transaction
+      examples.push(
+        `"${tx.description}" (${tx.type}) -> ${tx.category?.name} [similarité: ${similar.similarity.toFixed(2)}]`
+      )
+    }
+
+    // Complète avec des exemples récents si besoin
+    if (examples.length < 8) {
+      const recentExamples = await Transaction.query()
         .where('type', type)
         .whereNotNull('categoryId')
         .preload('category')
         .orderBy('created_at', 'desc')
-        .limit(1)
+        .limit(10)
 
-      // Ajouter des conditions pour chaque mot clé
-      keyWords.forEach((keyword) => {
-        if (keyword) {
-          query.andWhere('description', 'ilike', `%${keyword}%`)
+      for (const tx of recentExamples) {
+        if (tx.category && examples.length < 8) {
+          const exampleText = `"${tx.description}" (${tx.type}) -> ${tx.category.name}`
+          if (!examples.includes(exampleText)) {
+            examples.push(exampleText)
+          }
         }
-      })
-
-      const similarTransaction = await query.first()
-      return similarTransaction
-    } catch (error) {
-      console.error('Erreur lors de la recherche de transactions similaires:', error)
-      return null
+      }
     }
+
+    return examples
+  }
+
+  /**
+   * Construit un prompt enrichi avec le contexte d'historique
+   */
+  static buildEnhancedPrompt(
+    description: string,
+    type: 'credit' | 'debit',
+    categoryNames: string[],
+    contextualExamples: string[],
+    similarTransactions: SimilarTransaction[]
+  ): string {
+    let prompt = `Voici la liste des catégories existantes : ${categoryNames.join(', ')}.
+Type de la transaction : ${type === 'credit' ? 'crédit' : 'débit'}
+
+`
+
+    // Ajoute le contexte des transactions similaires si disponible
+    if (similarTransactions.length > 0) {
+      prompt += `TRANSACTIONS SIMILAIRES TROUVÉES DANS L'HISTORIQUE :
+${similarTransactions
+  .map(
+    (s) =>
+      `- "${s.transaction.description}" -> ${s.transaction.category?.name} (similarité: ${s.similarity.toFixed(2)}, mots-clés: ${s.matchedKeywords.join(', ')})`
+  )
+  .join('\n')}
+
+Ces transactions similaires suggèrent fortement une catégorie cohérente. Utilise cet historique pour faire un choix cohérent.
+
+`
+    }
+
+    prompt += `EXEMPLES DE CLASSIFICATION RÉCENTE :
+${contextualExamples.join('\n')}
+
+Règles métier importantes :
+- N'attribue jamais la catégorie "Ventes" à une transaction de type "débit".
+- N'attribue jamais la catégorie "Achat" à une transaction de type "crédit".
+- Si tu vois "RIT" ou "virement" dans le libellé d'un crédit, c'est probablement une vente.
+- Les mots clés comme "LOYER", "ASSURANCE", "TELECOM" sont importants pour la classification.
+- PRIORITÉ : Si des transactions similaires existent dans l'historique, utilise la même catégorie pour la cohérence.
+
+À partir de cet historique et de ces règles, à quelle catégorie EXACTE (nom dans la liste) appartient la transaction suivante ? "${description}"
+Donne uniquement le nom EXACT d'une catégorie existante, sans rien ajouter d'autre.`
+
+    return prompt
   }
 
   /**
@@ -178,6 +425,7 @@ Donne uniquement le nom EXACT d'une catégorie existante, sans rien ajouter d'au
           transaction.categoryId = suggestedCategory.id
           await transaction.save()
           updated++
+          console.log(`Transaction ${transaction.id} catégorisée: ${suggestedCategory.name}`)
         } else {
           errors++
         }

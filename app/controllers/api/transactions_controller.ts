@@ -200,6 +200,34 @@ export default class TransactionsController {
   }
 
   /**
+   * Mettre à jour la catégorie d'une transaction
+   */
+  async updateCategory({ request, params, response }: HttpContext) {
+    try {
+      const transactionId = params.id
+      const { categoryId } = request.only(['categoryId'])
+
+      console.log('PATCH reçu pour transaction', transactionId, 'nouvelle catégorie', categoryId)
+
+      const transaction = await Transaction.findOrFail(transactionId)
+      transaction.categoryId = categoryId
+      await transaction.save()
+
+      return response.json({
+        success: true,
+        message: 'Catégorie mise à jour avec succès',
+        data: transaction,
+      })
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la catégorie:', error)
+      return response.status(400).json({
+        success: false,
+        message: error.message || 'Une erreur est survenue lors de la mise à jour de la catégorie',
+      })
+    }
+  }
+
+  /**
    * Catégoriser automatiquement une ou plusieurs transactions
    */
   async autoCategorize({ request, response }: HttpContext) {
@@ -223,5 +251,165 @@ export default class TransactionsController {
         message: error.message || 'Une erreur est survenue lors de la catégorisation automatique',
       })
     }
+  }
+
+  async categoryTotals({ request, response }: HttpContext) {
+    const startDate = request.input('startDate')
+      ? DateTime.fromISO(request.input('startDate'))
+      : DateTime.now().minus({ months: 1 })
+
+    const endDate = request.input('endDate')
+      ? DateTime.fromISO(request.input('endDate'))
+      : DateTime.now()
+
+    const categoryIds = request.input('categoryIds', [])
+    const type = request.input('type') // 'credit', 'debit' ou undefined pour les deux
+
+    // Requête simplifiée qui inclut toutes les transactions avec des catégories
+    let query = Transaction.query()
+      .preload('category', (categoryBuilder) => {
+        categoryBuilder.preload('parent')
+      })
+      .whereNotNull('category_id') // Inclure seulement les transactions avec catégorie
+      .whereRaw('transaction_date BETWEEN ? AND ?', [
+        startDate.toSQLDate() ?? DateTime.now().toSQLDate()!,
+        endDate.toSQLDate() ?? DateTime.now().toSQLDate()!,
+      ])
+
+    if (type) {
+      query.where('type', type)
+    }
+
+    if (categoryIds.length > 0) {
+      query.whereIn('category_id', categoryIds)
+    }
+
+    const transactions = await query
+
+    console.log(`Found ${transactions.length} transactions for category totals`)
+
+    // Map pour regrouper par catégorie parente
+    const parentCategoryTotals = new Map<
+      number,
+      {
+        categoryId: number
+        categoryName: string
+        total: number
+        color?: string
+        icon?: string
+        children: Array<{
+          categoryId: number
+          categoryName: string
+          total: number
+          color?: string
+          icon?: string
+        }>
+      }
+    >()
+
+    // Map pour les catégories enfants individuelles
+    const childCategoryTotals = new Map<
+      number,
+      {
+        categoryId: number
+        categoryName: string
+        total: number
+        color?: string
+        icon?: string
+        parentId: number
+      }
+    >()
+
+    // Traiter chaque transaction
+    for (const transaction of transactions) {
+      if (!transaction.category) continue
+
+      // Si la transaction est exclue de Trésorerie et que c'est Trésorerie, on skip
+      if (transaction.category.name === 'Trésorerie') {
+        continue
+      }
+
+      const amount = Number(transaction.amount)
+      const category = transaction.category
+
+      // Déterminer la catégorie parente
+      const parentCategory = category.parentId && category.parent ? category.parent : category
+
+      const parentId = parentCategory.id
+      const parentName = parentCategory.name
+
+      // Ajouter au total de la catégorie parente
+      if (parentCategoryTotals.has(parentId)) {
+        const existing = parentCategoryTotals.get(parentId)!
+        existing.total += amount
+      } else {
+        parentCategoryTotals.set(parentId, {
+          categoryId: parentId,
+          categoryName: parentName,
+          total: amount,
+          color: parentCategory.color,
+          icon: parentCategory.icon,
+          children: [],
+        })
+      }
+
+      // Si c'est une catégorie enfant, ajouter aussi au détail des enfants
+      if (category.parentId && category.parent) {
+        const childId = category.id
+        const childName = category.name
+
+        if (childCategoryTotals.has(childId)) {
+          const existing = childCategoryTotals.get(childId)!
+          existing.total += amount
+        } else {
+          childCategoryTotals.set(childId, {
+            categoryId: childId,
+            categoryName: childName,
+            total: amount,
+            color: category.color,
+            icon: category.icon,
+            parentId: parentId,
+          })
+        }
+      }
+    }
+
+    // Regrouper les enfants sous leurs parents
+    for (const [childId, childData] of childCategoryTotals.entries()) {
+      const parent = parentCategoryTotals.get(childData.parentId)
+      if (parent) {
+        parent.children.push({
+          categoryId: childData.categoryId,
+          categoryName: childData.categoryName,
+          total: childData.total,
+          color: childData.color,
+          icon: childData.icon,
+        })
+      }
+    }
+
+    // Trier les enfants par montant décroissant pour chaque parent
+    for (const [parentId, parentData] of parentCategoryTotals.entries()) {
+      parentData.children.sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+    }
+
+    const formattedTotals = Array.from(parentCategoryTotals.values())
+
+    console.log(
+      `Returning ${formattedTotals.length} category totals with children:`,
+      formattedTotals.map((t) => ({
+        name: t.categoryName,
+        total: t.total,
+        childrenCount: t.children.length,
+      }))
+    )
+
+    return response.json({
+      period: {
+        start: startDate.toISODate(),
+        end: endDate.toISODate(),
+      },
+      totals: formattedTotals,
+    })
   }
 }
