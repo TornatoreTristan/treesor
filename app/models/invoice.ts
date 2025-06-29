@@ -14,19 +14,19 @@ export default class Invoice extends BaseModel {
   @column()
   declare number: string | null
 
-  @column()
+  @column({ columnName: 'user_id' })
   declare userId: string
 
-  @column()
+  @column({ columnName: 'assign_id' })
   declare assignId: string
 
-  @column()
+  @column({ columnName: 'document_url' })
   declare documentUrl: string
 
-  @column()
+  @column({ columnName: 'original_name' })
   declare originalName: string
 
-  @column()
+  @column({ columnName: 'mime_type' })
   declare mimeType: string
 
   @column()
@@ -38,16 +38,16 @@ export default class Invoice extends BaseModel {
   @column()
   declare status: 'pending' | 'paid' | 'rejected'
 
-  @column()
+  @column({ columnName: 'amount_ht' })
   declare amountHT: number
 
-  @column()
+  @column({ columnName: 'amount_ttc' })
   declare amountTTC: number
 
-  @column()
+  @column({ columnName: 'vat_rate' })
   declare vatRate: number
 
-  @column()
+  @column({ columnName: 'vat_amount' })
   declare vatAmount: number
 
   @column()
@@ -59,16 +59,16 @@ export default class Invoice extends BaseModel {
   @column.date({ columnName: 'due_date' })
   declare dueDate: DateTime | null
 
-  @column()
+  @column({ columnName: 'is_doublon' })
   declare isDoublon: boolean
 
-  @column()
+  @column({ columnName: 'category_id' })
   declare categoryId: number | null
 
-  @column()
+  @column({ columnName: 'vendor_id' })
   declare vendorId: number | null
 
-  @column()
+  @column({ columnName: 'bank_statement_id' })
   declare bankStatementId: number | null
 
   @column.dateTime({ autoCreate: true })
@@ -79,32 +79,32 @@ export default class Invoice extends BaseModel {
 
   // Relations
   @belongsTo(() => User, {
-    foreignKey: 'userId',
+    foreignKey: 'user_id',
   })
   declare user: BelongsTo<typeof User>
 
   @belongsTo(() => User, {
-    foreignKey: 'assignId',
+    foreignKey: 'assign_id',
   })
   declare assignedUser: BelongsTo<typeof User>
 
   @belongsTo(() => Category, {
-    foreignKey: 'categoryId',
+    foreignKey: 'category_id',
   })
   declare category: BelongsTo<typeof Category>
 
   @belongsTo(() => Vendor, {
-    foreignKey: 'vendorId',
+    foreignKey: 'vendor_id',
   })
   declare vendor: BelongsTo<typeof Vendor>
 
   @belongsTo(() => BankStatement, {
-    foreignKey: 'bankStatementId',
+    foreignKey: 'bank_statement_id',
   })
   declare bankStatement: BelongsTo<typeof BankStatement>
 
   @hasMany(() => Transaction, {
-    foreignKey: 'invoiceId',
+    foreignKey: 'invoice_id',
   })
   declare transactions: HasMany<typeof Transaction>
 }

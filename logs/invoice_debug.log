@@ -71,3 +71,85 @@
 2025-04-24T02:34:08.442Z - Message d'erreur final: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
 2025-04-24T02:34:08.756Z - Préparation de la réponse d'erreur
 2025-04-24T02:34:08.757Z - ========= FIN DE LA MÉTHODE STORE =========
+2025-06-25T01:48:52.514Z - ========= DÉBUT DE LA MÉTHODE STORE =========
+2025-06-25T01:48:52.515Z - Auth user: true
+2025-06-25T01:48:52.515Z - UserId: 6fe45132-a885-41cc-b574-5cb997e9353e
+2025-06-25T01:48:52.515Z - Avant récupération du fichier
+2025-06-25T01:48:52.515Z - Fichier récupéré: true
+2025-06-25T01:48:52.515Z - Fichier valide: true
+2025-06-25T01:48:52.516Z - Fichier valide, chemin: /var/folders/1l/v3l19ndd7t3btgcz44skv2yw0000gn/T/knhm573ihlm500nprpzbvuk8
+2025-06-25T01:48:52.516Z - Test de connexion à la base de données
+2025-06-25T01:48:52.630Z - ERREUR TEST SIMPLE: error: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:48:52.631Z - ======= ERREUR PRINCIPALE =======
+2025-06-25T01:48:52.631Z - Type d'erreur: Error
+2025-06-25T01:48:52.631Z - Message: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:48:52.632Z - Stack: Error: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+    at InvoicesController.store (/Users/tristan/Documents/dev/treesor/app/controllers/invoices/invoices_controller.ts:171:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async ShieldMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/shield/build/chunk-2UDO3ZLM.js:28:5)
+    at async SessionMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/session/src/session_middleware.ts:81:22)
+    at async InertiaMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/inertia/build/chunk-W7TVEB4V.js:393:5)
+    at async ViteMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/vite/src/vite_middleware.ts:42:5)
+    at async <anonymous> (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/static/src/static_middleware.ts:74:11)
+2025-06-25T01:48:52.633Z - Message d'erreur final: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:48:52.848Z - Préparation de la réponse d'erreur
+2025-06-25T01:48:52.849Z - ========= FIN DE LA MÉTHODE STORE =========
+2025-06-25T01:49:41.036Z - ========= DÉBUT DE LA MÉTHODE STORE =========
+2025-06-25T01:49:41.036Z - Auth user: true
+2025-06-25T01:49:41.037Z - UserId: 6fe45132-a885-41cc-b574-5cb997e9353e
+2025-06-25T01:49:41.037Z - Avant récupération du fichier
+2025-06-25T01:49:41.037Z - Fichier récupéré: true
+2025-06-25T01:49:41.037Z - Fichier valide: true
+2025-06-25T01:49:41.037Z - Fichier valide, chemin: /var/folders/1l/v3l19ndd7t3btgcz44skv2yw0000gn/T/nczxdq4mklhlthaca33uk6yr
+2025-06-25T01:49:41.037Z - Test de connexion à la base de données
+2025-06-25T01:49:41.147Z - ERREUR TEST SIMPLE: error: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:49:41.147Z - ======= ERREUR PRINCIPALE =======
+2025-06-25T01:49:41.147Z - Type d'erreur: Error
+2025-06-25T01:49:41.147Z - Message: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:49:41.148Z - Stack: Error: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+    at InvoicesController.store (/Users/tristan/Documents/dev/treesor/app/controllers/invoices/invoices_controller.ts:171:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async ShieldMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/shield/build/chunk-2UDO3ZLM.js:28:5)
+    at async SessionMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/session/src/session_middleware.ts:81:22)
+    at async InertiaMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/inertia/build/chunk-W7TVEB4V.js:393:5)
+    at async ViteMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/vite/src/vite_middleware.ts:42:5)
+    at async <anonymous> (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/static/src/static_middleware.ts:74:11)
+2025-06-25T01:49:41.148Z - Message d'erreur final: Test simple échoué: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "is_doublon", "notes", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:49:41.360Z - Préparation de la réponse d'erreur
+2025-06-25T01:49:41.361Z - ========= FIN DE LA MÉTHODE STORE =========
+2025-06-25T01:53:08.956Z - ========= DÉBUT DE LA MÉTHODE STORE =========
+2025-06-25T01:53:08.956Z - UserId: 6fe45132-a885-41cc-b574-5cb997e9353e
+2025-06-25T01:53:08.957Z - Fichier valide, chemin: /var/folders/1l/v3l19ndd7t3btgcz44skv2yw0000gn/T/lmhd48q02ox61leizt93vqox
+2025-06-25T01:53:09.067Z - ERREUR CRÉATION: error: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:53:09.068Z - ======= ERREUR PRINCIPALE =======
+2025-06-25T01:53:09.068Z - Type d'erreur: Error
+2025-06-25T01:53:09.068Z - Message: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:53:09.072Z - Stack: Error: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+    at InvoicesController.store (/Users/tristan/Documents/dev/treesor/app/controllers/invoices/invoices_controller.ts:262:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async ShieldMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/shield/build/chunk-2UDO3ZLM.js:28:5)
+    at async SessionMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/session/src/session_middleware.ts:81:22)
+    at async InertiaMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/inertia/build/chunk-W7TVEB4V.js:393:5)
+    at async ViteMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/vite/src/vite_middleware.ts:42:5)
+    at async <anonymous> (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/static/src/static_middleware.ts:74:11)
+2025-06-25T01:53:09.073Z - Message d'erreur final: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:53:09.394Z - Préparation de la réponse d'erreur
+2025-06-25T01:53:09.395Z - ========= FIN DE LA MÉTHODE STORE =========
+2025-06-25T01:54:19.095Z - ========= DÉBUT DE LA MÉTHODE STORE =========
+2025-06-25T01:54:19.095Z - UserId: 6fe45132-a885-41cc-b574-5cb997e9353e
+2025-06-25T01:54:19.096Z - Fichier valide, chemin: /var/folders/1l/v3l19ndd7t3btgcz44skv2yw0000gn/T/crhicy3kaibz2pz5a6xfntb9
+2025-06-25T01:54:19.203Z - ERREUR CRÉATION: error: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:54:19.204Z - ======= ERREUR PRINCIPALE =======
+2025-06-25T01:54:19.204Z - Type d'erreur: Error
+2025-06-25T01:54:19.204Z - Message: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:54:19.205Z - Stack: Error: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+    at InvoicesController.store (/Users/tristan/Documents/dev/treesor/app/controllers/invoices/invoices_controller.ts:262:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async ShieldMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/shield/build/chunk-2UDO3ZLM.js:28:5)
+    at async SessionMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/session/src/session_middleware.ts:81:22)
+    at async InertiaMiddleware.handle (file:///Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/inertia/build/chunk-W7TVEB4V.js:393:5)
+    at async ViteMiddleware.handle (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/vite/src/vite_middleware.ts:42:5)
+    at async <anonymous> (/Users/tristan/Documents/dev/treesor/node_modules/@adonisjs/static/src/static_middleware.ts:74:11)
+2025-06-25T01:54:19.205Z - Message d'erreur final: Création échouée: insert into "invoices" ("amount_ht", "amount_ttc", "created_at", "date", "document_url", "due_date", "is_doublon", "notes", "number", "status", "updated_at", "user_id", "vat_amount", "vat_rate") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning "id" - column "amount_ht" of relation "invoices" does not exist
+2025-06-25T01:54:19.431Z - Préparation de la réponse d'erreur
+2025-06-25T01:54:19.431Z - ========= FIN DE LA MÉTHODE STORE =========
