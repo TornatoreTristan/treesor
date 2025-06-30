@@ -18,10 +18,11 @@ router
 // Routes des factures avec authentification
 router
   .group(() => {
-    router.get('/invoices', [InvoicesController, 'apiIndex'])
-    router.post('/invoices', [InvoicesController, 'apiStore'])
-    router.post('/invoices/upload', [InvoicesController, 'store'])
-    router.post('/invoices/analyze', [InvoicesController, 'analyze'])
+    router.get('/invoices', [InvoicesController, 'index'])
+    router.post('/invoices', [InvoicesController, 'store'])
+    router.get('/invoices/:id', [InvoicesController, 'show'])
+    router.put('/invoices/:id', [InvoicesController, 'update'])
+    router.delete('/invoices/:id', [InvoicesController, 'destroy'])
   })
   .prefix('/api')
   .use(middleware.auth())

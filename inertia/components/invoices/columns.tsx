@@ -1,7 +1,8 @@
 import { ColumnDef } from '@tanstack/react-table'
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react'
+import { ArrowUpDown, Edit, Trash2 } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { Invoice, InvoiceStatus } from '~/types/invoice'
+import { Link, router } from '@inertiajs/react'
 
 // Fonction pour formatter les montants en euros
 function formatCurrency(amount: number | undefined): string {
@@ -43,6 +44,25 @@ function StatusBadge({ status }: { status: InvoiceStatus }) {
       {statusLabels[status]}
     </span>
   )
+}
+
+// Fonction de suppression avec confirmation
+function deleteInvoice(invoice: Invoice) {
+  const confirmed = window.confirm(
+    `Êtes-vous sûr de vouloir supprimer la facture ${invoice.invoiceNumber || invoice.id} ?\n\nCette action est irréversible.`
+  )
+
+  if (confirmed) {
+    router.delete(`/api/invoices/${invoice.id}`, {
+      onSuccess: () => {
+        // Recharger la page pour voir les changements
+        window.location.reload()
+      },
+      onError: () => {
+        alert('Erreur lors de la suppression de la facture')
+      },
+    })
+  }
 }
 
 export const columns: ColumnDef<Invoice>[] = [
@@ -151,14 +171,26 @@ export const columns: ColumnDef<Invoice>[] = [
   },
   {
     id: 'actions',
+    header: 'Actions',
     cell: ({ row }) => {
       const invoice = row.original
 
       return (
-        <div className="text-right">
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Ouvrir le menu</span>
-            <MoreHorizontal className="h-4 w-4" />
+        <div className="text-right space-x-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/invoices/${invoice.id}/edit`}>
+              <Edit className="h-4 w-4" />
+              <span className="sr-only">Modifier</span>
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-800"
+            onClick={() => deleteInvoice(invoice)}
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Supprimer</span>
           </Button>
         </div>
       )

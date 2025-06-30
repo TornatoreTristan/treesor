@@ -8,6 +8,9 @@ const TransactionsController = () => import('#controllers/transactions/transacti
 const InvoicesController = () => import('#controllers/invoices/invoices_controller')
 const JustificatifsController = () => import('#controllers/justificatifs/justificatifs_controller')
 
+// Route d'analyse accessible pour les utilisateurs connectés via session
+router.post('/invoices/analyze', [InvoicesController, 'analyze']).use(middleware.auth())
+
 router
   .group(() => {
     router.get('/', [HomeController, 'show'])
@@ -18,7 +21,7 @@ router
     router.get('/categories', [CategoriesController, 'show'])
     router.get('/invoices', [InvoicesController, 'index'])
     router.get('/invoices/create', [InvoicesController, 'create'])
-    router.post('/invoices/analyze', [InvoicesController, 'analyze'])
+    router.get('/invoices/:id/edit', [InvoicesController, 'edit'])
     router.get('/justificatifs', [JustificatifsController, 'show'])
   })
   .use(middleware.auth())

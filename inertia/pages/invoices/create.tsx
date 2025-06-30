@@ -17,7 +17,6 @@ import { useRef, useState } from 'react'
 import { FormEvent } from 'react'
 import { ChevronLeft, FileTextIcon, Loader2 } from 'lucide-react'
 import { Link } from '@inertiajs/react'
-import axios from 'axios'
 
 interface CreateInvoiceProps {
   vendors?: { id: number; name: string }[]
@@ -57,11 +56,13 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
     if (!isNaN(htAmount) && !isNaN(vatRate)) {
       const vatAmount = (htAmount * vatRate) / 100
       const ttc = htAmount + vatAmount
-      setData({
-        ...data,
+
+      // Utiliser la forme fonctionnelle pour éviter les problèmes de state
+      setData((prevData) => ({
+        ...prevData,
         vatAmount: vatAmount.toFixed(2),
         amountTTC: ttc.toFixed(2),
-      })
+      }))
     }
   }
 
@@ -111,25 +112,40 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
       const formData = new FormData()
       formData.append('document', file)
 
-      const response = await axios.post('/invoices/analyze', formData, {
+      // Récupérer le token CSRF depuis la meta tag
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+
+      const response = await fetch('/invoices/analyze', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
         },
       })
 
-      if (response.data.success) {
-        const { invoiceData, confidenceScore } = response.data.data
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const responseData = await response.json()
+      console.log('Résultat analyse:', responseData)
+
+      if (responseData.success) {
+        const invoiceData = responseData.data.invoiceData
+        const confidenceScore = responseData.data.confidenceScore
 
         // Mettre à jour les champs du formulaire avec les données extraites
         const updates: Record<string, any> = {}
         const fieldsUpdated: string[] = []
 
-        if (invoiceData.number && !data.number) {
+        if (invoiceData?.number && !data.number) {
           updates.number = invoiceData.number
           fieldsUpdated.push('Numéro de facture')
         }
 
-        if (invoiceData.amountHT) {
+        if (invoiceData?.amountHT) {
           updates.amountHT = invoiceData.amountHT.toString()
           fieldsUpdated.push('Montant HT')
 
@@ -141,32 +157,32 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
           }
         }
 
-        if (invoiceData.amountTTC) {
+        if (invoiceData?.amountTTC) {
           updates.amountTTC = invoiceData.amountTTC.toString()
           fieldsUpdated.push('Montant TTC')
         }
 
-        if (invoiceData.vatRate) {
+        if (invoiceData?.vatRate) {
           updates.vatRate = invoiceData.vatRate.toString()
           fieldsUpdated.push('Taux de TVA')
         }
 
-        if (invoiceData.vatAmount) {
+        if (invoiceData?.vatAmount) {
           updates.vatAmount = invoiceData.vatAmount.toString()
           fieldsUpdated.push('Montant TVA')
         }
 
-        if (invoiceData.date) {
+        if (invoiceData?.date) {
           updates.date = invoiceData.date
           fieldsUpdated.push('Date de facture')
         }
 
-        if (invoiceData.dueDate) {
+        if (invoiceData?.dueDate) {
           updates.dueDate = invoiceData.dueDate
           fieldsUpdated.push("Date d'échéance")
         }
 
-        if (invoiceData.vendorId) {
+        if (invoiceData?.vendorId) {
           updates.vendorId = invoiceData.vendorId.toString()
           fieldsUpdated.push('Fournisseur')
         }
@@ -189,6 +205,8 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
           // Afficher un message de succès avec les champs mis à jour
           console.log(`Analyse réussie! Champs mis à jour: ${fieldsUpdated.join(', ')}`)
           console.log(`Score de confiance: ${Math.round(confidenceScore * 100)}%`)
+        } else {
+          console.warn("L'analyse n'a pas trouvé de données pertinentes dans le document")
         }
       } else {
         console.warn("L'analyse n'a pas trouvé de données pertinentes dans le document")
@@ -476,8 +494,20 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
                       placeholder="0.00"
                       value={data.amountHT}
                       onChange={(e) => {
-                        setData('amountHT', e.target.value)
-                        calculateVat(e.target.value, data.vatRate)
+                        const newHT = e.target.value
+                        setData((prevData) => {
+                          const newData = { ...prevData, amountHT: newHT }
+                          // Recalculer immédiatement avec les nouvelles valeurs
+                          const htAmount = parseFloat(newHT || '0')
+                          const vatRate = parseFloat(prevData.vatRate || '0')
+                          if (!isNaN(htAmount) && !isNaN(vatRate)) {
+                            const vatAmount = (htAmount * vatRate) / 100
+                            const ttc = htAmount + vatAmount
+                            newData.vatAmount = vatAmount.toFixed(2)
+                            newData.amountTTC = ttc.toFixed(2)
+                          }
+                          return newData
+                        })
                       }}
                     />
                     {errors.amountHT && <p className="text-red-500 text-sm">{errors.amountHT}</p>}
@@ -492,8 +522,20 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
                       placeholder="20"
                       value={data.vatRate}
                       onChange={(e) => {
-                        setData('vatRate', e.target.value)
-                        calculateVat(data.amountHT, e.target.value)
+                        const newRate = e.target.value
+                        setData((prevData) => {
+                          const newData = { ...prevData, vatRate: newRate }
+                          // Recalculer immédiatement avec les nouvelles valeurs
+                          const htAmount = parseFloat(prevData.amountHT || '0')
+                          const vatRate = parseFloat(newRate || '0')
+                          if (!isNaN(htAmount) && !isNaN(vatRate)) {
+                            const vatAmount = (htAmount * vatRate) / 100
+                            const ttc = htAmount + vatAmount
+                            newData.vatAmount = vatAmount.toFixed(2)
+                            newData.amountTTC = ttc.toFixed(2)
+                          }
+                          return newData
+                        })
                       }}
                     />
                     {errors.vatRate && <p className="text-red-500 text-sm">{errors.vatRate}</p>}
@@ -507,8 +549,23 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
                       step="0.01"
                       placeholder="0.00"
                       value={data.vatAmount}
-                      onChange={(e) => setData('vatAmount', e.target.value)}
-                      readOnly
+                      onChange={(e) => {
+                        const newVatAmount = e.target.value
+                        setData((prevData) => {
+                          const newData = { ...prevData, vatAmount: newVatAmount }
+                          // Recalculer TTC = HT + TVA
+                          const ht = parseFloat(prevData.amountHT || '0')
+                          const tva = parseFloat(newVatAmount || '0')
+                          if (!isNaN(ht) && !isNaN(tva)) {
+                            newData.amountTTC = (ht + tva).toFixed(2)
+                            // Recalculer le taux de TVA si possible
+                            if (ht > 0) {
+                              newData.vatRate = ((tva / ht) * 100).toFixed(1)
+                            }
+                          }
+                          return newData
+                        })
+                      }}
                     />
                     {errors.vatAmount && <p className="text-red-500 text-sm">{errors.vatAmount}</p>}
                   </div>
@@ -521,8 +578,24 @@ export default function CreateInvoice({ vendors = [], categories = [] }: CreateI
                       step="0.01"
                       placeholder="0.00"
                       value={data.amountTTC}
-                      onChange={(e) => setData('amountTTC', e.target.value)}
-                      readOnly
+                      onChange={(e) => {
+                        const newTTC = e.target.value
+                        setData((prevData) => {
+                          const newData = { ...prevData, amountTTC: newTTC }
+                          // Recalculer TVA = TTC - HT
+                          const ht = parseFloat(prevData.amountHT || '0')
+                          const ttc = parseFloat(newTTC || '0')
+                          if (!isNaN(ht) && !isNaN(ttc)) {
+                            const tva = ttc - ht
+                            newData.vatAmount = tva.toFixed(2)
+                            // Recalculer le taux de TVA
+                            if (ht > 0) {
+                              newData.vatRate = ((tva / ht) * 100).toFixed(1)
+                            }
+                          }
+                          return newData
+                        })
+                      }}
                     />
                     {errors.amountTTC && <p className="text-red-500 text-sm">{errors.amountTTC}</p>}
                   </div>

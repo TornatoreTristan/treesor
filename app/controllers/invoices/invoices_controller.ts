@@ -1,491 +1,506 @@
-import { HttpContext } from '@adonisjs/core/http'
-import Invoice from '#models/invoice'
-import {
-  UploadInvoiceFileUseCase,
-  InvoiceFileData,
-} from '../../domain/invoices/use_cases/upload_invoice_file_use_case.js'
+import type { HttpContext } from '@adonisjs/core/http'
+
+import { FetchInvoiceUseCase } from '#domain/invoices/use_cases/fetch_invoice_use_case'
+import { FetchAllInvoicesUseCase } from '#domain/invoices/use_cases/fetch_all_invoices_use_case'
+import { CreateInvoiceUseCase } from '#domain/invoices/use_cases/create_invoice_use_case'
+import { UpdateInvoiceUseCase } from '#domain/invoices/use_cases/update_invoice_use_case'
+import { DeleteInvoiceUseCase } from '#domain/invoices/use_cases/delete_invoice_use_case'
 import { InvoiceRepository } from '../../infrastructure/repositories/invoice_repository.js'
-import { DriveService as InfrastructureDriveService } from '../../infrastructure/services/drive_service.js'
-import { DriveService as AppDriveService } from '#services/drive_service'
-import { DriveServiceInterface } from '../../domain/core/services/drive_service_interface.js'
-import { DateTime } from 'luxon'
-import Vendor from '#models/vendors'
-import Category from '#models/categorie'
-import router from '@adonisjs/core/services/router'
-import drive from '@adonisjs/drive/services/main'
-import * as nodeFs from 'node:fs'
-import { appendFileSync } from 'node:fs'
-import { PdfAnalyzerService } from '../../infrastructure/services/pdf_analyzer_service.js'
-import { ImprovedPdfAnalyzerService } from 'app/infrastructure/services/improved_pdf_analyzer_service.js'
-
-// Fonction pour enregistrer les logs dans un fichier
-function logToFile(message: string) {
-  try {
-    const logMessage = `${new Date().toISOString()} - ${message}\n`
-    console.log(logMessage)
-    appendFileSync('logs/invoice_debug.log', logMessage)
-  } catch (error) {
-    console.error("Erreur lors de l'écriture du log:", error)
-  }
-}
-
-// Adaptateur qui permet d'utiliser le service DriveService standard avec l'interface DriveServiceInterface
-class DriveServiceAdapter implements DriveServiceInterface {
-  constructor(private appDriveService: AppDriveService) {}
-
-  async uploadFile(filePath: string, tmpPath: string): Promise<string> {
-    // Utilisation directe de drive pour contourner le problème
-    const fs = drive.use('fs')
-    await fs.put(filePath, tmpPath)
-    return await fs.getUrl(filePath)
-  }
-
-  async deleteFile(filePath: string): Promise<void> {
-    const fs = drive.use('fs')
-    if (await fs.exists(filePath)) {
-      await fs.delete(filePath)
-    }
-  }
-}
+import { AiPdfAnalyzerService } from '../../infrastructure/services/ai_pdf_analyzer_service.js'
 
 export default class InvoicesController {
-  // API: Récupérer la liste des factures en JSON
-  async apiIndex({ response, auth }: HttpContext) {
+  private invoiceRepository: InvoiceRepository
+  private fetchInvoiceUseCase: FetchInvoiceUseCase
+  private fetchAllInvoicesUseCase: FetchAllInvoicesUseCase
+  private createInvoiceUseCase: CreateInvoiceUseCase
+  private updateInvoiceUseCase: UpdateInvoiceUseCase
+  private deleteInvoiceUseCase: DeleteInvoiceUseCase
+  private aiPdfAnalyzerService: AiPdfAnalyzerService
+
+  constructor() {
+    this.invoiceRepository = new InvoiceRepository()
+    this.fetchInvoiceUseCase = new FetchInvoiceUseCase(this.invoiceRepository)
+    this.fetchAllInvoicesUseCase = new FetchAllInvoicesUseCase(this.invoiceRepository)
+    this.createInvoiceUseCase = new CreateInvoiceUseCase(this.invoiceRepository)
+    this.updateInvoiceUseCase = new UpdateInvoiceUseCase(this.invoiceRepository)
+    this.deleteInvoiceUseCase = new DeleteInvoiceUseCase(this.invoiceRepository)
+    this.aiPdfAnalyzerService = new AiPdfAnalyzerService()
+  }
+
+  /**
+   * Get all invoices - Render Inertia page
+   */
+  async index({ inertia, auth }: HttpContext) {
     try {
-      if (!auth.user) {
-        return response.status(401).json({
-          success: false,
-          error: 'Utilisateur non authentifié',
-        })
-      }
+      const user = auth.user!
+      const invoiceEntities = await this.fetchAllInvoicesUseCase.execute(user.id)
 
-      const invoices = await Invoice.query()
-        .preload('category')
-        .preload('vendor')
-        .orderBy('createdAt', 'desc')
-
-      const mappedInvoices = invoices.map((invoice) => ({
-        id: invoice.id,
-        invoiceNumber: invoice.number || `INV-${invoice.id}`,
-        date: invoice.date ? invoice.date.toISODate() : null,
-        dueDate: invoice.dueDate ? invoice.dueDate.toISODate() : null,
-        clientName: invoice.vendor?.name || 'Non spécifié',
-        amount: invoice.amountHT,
-        vatRate: invoice.vatRate,
-        vatAmount: invoice.vatAmount,
-        totalAmount: invoice.amountTTC,
-        status: this.mapInvoiceStatus(invoice.status),
-        description: invoice.notes || 'Aucune description',
-        category: invoice.category?.name || 'Non catégorisé',
-        createdAt: invoice.createdAt.toISO(),
-        updatedAt: invoice.updatedAt.toISO(),
-        documentUrl: invoice.documentUrl,
+      // Mapper les entités vers le format attendu par le frontend
+      const invoices = invoiceEntities.map((entity) => ({
+        id: entity.id!,
+        invoiceNumber: entity.number || `INV-${entity.id}`,
+        date: this.formatDate(entity.date) || this.formatDate(entity.createdAt) || '',
+        dueDate: this.formatDate(entity.dueDate) || '',
+        clientName: entity.vendor?.name || `Vendor ${entity.vendorId || 'Unknown'}`,
+        amount: entity.amountHT,
+        vatRate: entity.vatRate,
+        vatAmount: entity.vatAmount,
+        totalAmount: entity.amountTTC,
+        status: this.mapStatus(entity.status),
+        description: entity.type,
+        notes: entity.notes || '',
+        createdAt: this.formatDateTime(entity.createdAt) || '',
+        updatedAt: this.formatDateTime(entity.updatedAt) || '',
+        category: entity.category?.name || '',
       }))
 
-      return response.status(200).json({
-        success: true,
-        data: mappedInvoices,
+      return inertia.render('invoices/index', {
+        invoices,
       })
     } catch (error) {
-      return response.status(500).json({
-        success: false,
-        error: 'Erreur lors de la récupération des factures',
+      return inertia.render('errors/server_error', {
+        message: 'Failed to fetch invoices',
+        error: error.message,
       })
     }
   }
 
-  // Afficher la liste des factures
-  async index({ inertia }: HttpContext) {
-    const invoices = await Invoice.query()
-      .preload('category')
-      .preload('vendor')
-      .orderBy('createdAt', 'desc')
-
-    // Mapper les factures pour l'affichage frontend
-    const mappedInvoices = invoices.map((invoice) => ({
-      id: invoice.id,
-      invoiceNumber: invoice.number || `INV-${invoice.id}`,
-      date: invoice.date ? invoice.date.toISODate() : null,
-      dueDate: invoice.dueDate ? invoice.dueDate.toISODate() : null,
-      clientName: invoice.vendor?.name || 'Non spécifié',
-      amount: invoice.amountHT,
-      vatRate: invoice.vatRate,
-      vatAmount: invoice.vatAmount,
-      totalAmount: invoice.amountTTC,
-      status: this.mapInvoiceStatus(invoice.status),
-      description: invoice.notes || 'Aucune description',
-      category: invoice.category?.name || 'Non catégorisé',
-      createdAt: invoice.createdAt.toISO(),
-      updatedAt: invoice.updatedAt.toISO(),
-      documentUrl: invoice.documentUrl,
-    }))
-
-    return inertia.render('invoices/index', { invoices: mappedInvoices })
+  /**
+   * Map backend status to frontend status
+   */
+  private mapStatus(
+    backendStatus: 'pending' | 'paid' | 'rejected'
+  ): 'draft' | 'pending' | 'paid' | 'cancelled' | 'overdue' {
+    switch (backendStatus) {
+      case 'pending':
+        return 'pending'
+      case 'paid':
+        return 'paid'
+      case 'rejected':
+        return 'cancelled'
+      default:
+        return 'draft'
+    }
   }
 
-  // Afficher le formulaire de création de facture
+  /**
+   * Format date for frontend (YYYY-MM-DD)
+   */
+  private formatDate(date: any): string | null {
+    if (!date) return null
+    if (typeof date === 'string') return date.split('T')[0] // Prend seulement la partie date
+    if (date.toISODate) return date.toISODate() // DateTime object
+    return null
+  }
+
+  /**
+   * Format datetime for frontend (ISO string)
+   */
+  private formatDateTime(date: any): string | null {
+    if (!date) return null
+    if (typeof date === 'string') return date
+    if (date.toISO) return date.toISO() // DateTime object
+    return null
+  }
+
+  /**
+   * Show create form
+   */
   async create({ inertia }: HttpContext) {
-    // Charger les fournisseurs et les catégories pour les menus déroulants
-    const vendors = await Vendor.all()
-    const categories = await Category.all()
-
-    // Simplifier les données pour le frontend
-    const vendorsData = vendors.map((vendor) => ({
-      id: vendor.id,
-      name: vendor.name,
-    }))
-
-    const categoriesData = categories.map((category) => ({
-      id: category.id,
-      name: category.name,
-    }))
-
-    return inertia.render('invoices/create', {
-      vendors: vendorsData,
-      categories: categoriesData,
-    })
-  }
-
-  // API SIMPLE: Créer une facture avec les données fournies
-  async apiStore({ request, response, auth, session, inertia }: HttpContext) {
     try {
-      if (!auth.user) {
-        // Si c'est Inertia, rediriger
-        if (request.header('x-inertia')) {
-          session.flash('error', 'Non authentifié')
-          return response.redirect().back()
-        }
-        return response.status(401).json({ success: false, error: 'Non authentifié' })
-      }
+      // Pour le moment, on passe des tableaux vides
+      // Tu pourras ajouter plus tard les use cases pour récupérer vendors et categories
+      const vendors: any[] = []
+      const categories: any[] = []
 
-      // Récupérer TOUTES les données
-      const data = request.all()
-
-      // Créer la facture
-      const invoiceData: any = {
-        userId: auth.user.id.toString(),
-        status: 'pending',
-        isDoublon: false,
-      }
-
-      // Mapper les données
-      if (data.number) invoiceData.number = data.number
-      if (data.amountHT) invoiceData.amountHT = Number.parseFloat(data.amountHT.toString())
-      if (data.amountTTC) invoiceData.amountTTC = Number.parseFloat(data.amountTTC.toString())
-      if (data.vatRate) invoiceData.vatRate = Number.parseFloat(data.vatRate.toString())
-      if (data.vatAmount) invoiceData.vatAmount = Number.parseFloat(data.vatAmount.toString())
-      if (data.notes) invoiceData.notes = data.notes
-      if (data.status) invoiceData.status = data.status
-
-      // Dates
-      if (data.date) invoiceData.date = DateTime.fromISO(data.date.toString())
-      if (data.dueDate) invoiceData.dueDate = DateTime.fromISO(data.dueDate.toString())
-
-      // Relations
-      if (data.categoryId) invoiceData.categoryId = Number.parseInt(data.categoryId.toString())
-      if (data.vendorId) invoiceData.vendorId = Number.parseInt(data.vendorId.toString())
-
-      // Créer avec les propriétés camelCase
-      const adaptedData = {
-        number: invoiceData.number,
-        userId: invoiceData.userId,
-        assignId: invoiceData.assignId || invoiceData.userId,
-        documentUrl: invoiceData.documentUrl,
-        originalName: invoiceData.originalName || 'unknown.pdf',
-        mimeType: invoiceData.mimeType || 'application/pdf',
-        size: invoiceData.size || 0,
-        type: invoiceData.type || 'invoice',
-        status: invoiceData.status,
-        amountHT: invoiceData.amountHT,
-        amountTTC: invoiceData.amountTTC,
-        vatRate: invoiceData.vatRate,
-        vatAmount: invoiceData.vatAmount,
-        notes: invoiceData.notes,
-        date: invoiceData.date,
-        dueDate: invoiceData.dueDate,
-        isDoublon: invoiceData.isDoublon,
-        categoryId: invoiceData.categoryId,
-        vendorId: invoiceData.vendorId,
-      }
-
-      // CRÉER EN BDD - AVEC LOGS POUR VOIR CE QUI SE PASSE
-      console.log('🔥 TENTATIVE CRÉATION:', adaptedData)
-      const invoice = await Invoice.create(adaptedData)
-      console.log('✅ CRÉÉ EN BDD:', invoice.toJSON())
-
-      // RÉPONSE SELON TYPE
-      if (request.header('x-inertia')) {
-        session.flash('success', 'Facture créée !')
-        return response.redirect().toRoute('invoices')
-      } else {
-        return response.status(201).json({
-          success: true,
-          data: { id: invoice.id, message: 'Facture créée !' },
-        })
-      }
+      return inertia.render('invoices/create', {
+        vendors,
+        categories,
+      })
     } catch (error) {
-      console.error('ERREUR:', error)
-
-      if (request.header('x-inertia')) {
-        session.flash('error', 'Erreur création')
-        return response.redirect().back()
-      } else {
-        return response.status(500).json({ success: false, error: 'Erreur création' })
-      }
+      return inertia.render('errors/server_error', {
+        message: 'Failed to load create form',
+        error: error.message,
+      })
     }
   }
 
-  // Traiter la soumission du formulaire de création (API + Web)
-  async store({ request, response, auth, inertia, session }: HttpContext) {
-    logToFile('========= DÉBUT DE LA MÉTHODE STORE =========')
-
+  /**
+   * Show edit form
+   */
+  async edit({ params, inertia }: HttpContext) {
     try {
-      if (!auth.user) {
-        const error = 'Utilisateur non authentifié'
+      const invoice = await this.fetchInvoiceUseCase.execute(params.id)
 
-        // Si c'est une requête API (JSON), retourner JSON
-        if (request.header('accept')?.includes('application/json')) {
-          return response.status(401).json({ success: false, error })
-        }
+      // Pour le moment, on passe des tableaux vides
+      const vendors: any[] = []
+      const categories: any[] = []
 
-        // Sinon, interface web classique
-        session.flash('error', error)
-        return inertia.render('invoices/create', {
-          errors: { auth: error },
+      return inertia.render('invoices/edit', {
+        invoice,
+        vendors,
+        categories,
+      })
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return inertia.render('errors/not_found', {
+          message: 'Invoice not found',
         })
       }
 
-      const userId = auth.user.id
-      logToFile(`UserId: ${userId}`)
+      return inertia.render('errors/server_error', {
+        message: 'Failed to load edit form',
+        error: error.message,
+      })
+    }
+  }
 
-      // Récupération des données du formulaire
+  /**
+   * Get a single invoice
+   */
+  async show({ params, response }: HttpContext) {
+    try {
+      const invoice = await this.fetchInvoiceUseCase.execute(params.id)
+
+      return response.ok({
+        success: true,
+        data: invoice,
+      })
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return response.notFound({
+          success: false,
+          message: 'Invoice not found',
+        })
+      }
+
+      return response.internalServerError({
+        success: false,
+        message: 'Failed to fetch invoice',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Create a new invoice
+   */
+  async store({ request, response, auth }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      // Gestion de l'upload de fichier
+      const document = request.file('document')
+      if (!document) {
+        return response.badRequest({
+          success: false,
+          message: 'Le document est requis',
+        })
+      }
+
+      // Déplacer le fichier vers le dossier storage/invoices
+      const fileName = `${Date.now()}_${document.clientName}`
+      await document.move('storage/invoices', {
+        name: fileName,
+      })
+
+      // Récupérer les données du formulaire
       const formData = request.only([
         'number',
+        'status',
         'amountHT',
         'amountTTC',
         'vatRate',
         'vatAmount',
+        'notes',
         'date',
         'dueDate',
-        'notes',
         'categoryId',
         'vendorId',
       ])
 
-      // Récupération du fichier
-      const file = request.file('document', {
-        size: '10mb',
-        extnames: ['pdf', 'png', 'jpg', 'jpeg'],
-      })
-
-      if (!file || !file.isValid) {
-        const error = file ? file.errors : 'Aucun fichier fourni'
-
-        if (request.header('accept')?.includes('application/json')) {
-          return response.status(400).json({ success: false, error })
+      // 🤖 ANALYSE IA AUTOMATIQUE pour les fichiers PDF
+      let aiExtractedData: any = {}
+      if (document.type?.includes('pdf')) {
+        try {
+          console.log("🔍 ANALYSE IA AUTO: Début de l'analyse du PDF uploadé")
+          const filePath = `storage/invoices/${fileName}`
+          const analysisResult = await this.aiPdfAnalyzerService.analyzePdf(filePath)
+          aiExtractedData = this.mapAnalysisToInvoiceData(analysisResult)
+          console.log('✅ ANALYSE IA AUTO: Données extraites:', aiExtractedData)
+        } catch (analyzeError) {
+          console.warn(
+            "⚠️ ANALYSE IA AUTO: Échec de l'analyse automatique, continuons sans:",
+            analyzeError.message
+          )
+          // On continue même si l'analyse échoue
         }
-
-        session.flash('error', error)
-        return inertia.render('invoices/create', { errors: { document: error } })
       }
 
-      logToFile(`Fichier valide, chemin: ${file.tmpPath}`)
-
-      try {
-        // Upload du fichier
-        const fs = drive.use('fs')
-        const filePath = `invoices/${Date.now()}_${file.clientName}`
-        await fs.put(filePath, file.tmpPath!)
-        const documentUrl = await fs.getUrl(filePath)
-
-        // Création de la facture avec les données du formulaire
-        const invoiceData: any = {
-          userId: userId.toString(),
-          status: 'pending',
-          isDoublon: false,
-          documentUrl,
-          notes: formData.notes || 'Facture créée via upload',
-        }
-
-        // Ajouter les données financières si fournies
-        if (formData.number) invoiceData.number = formData.number
-        if (formData.amountHT)
-          invoiceData.amountHT = Number.parseFloat(formData.amountHT.toString())
-        if (formData.amountTTC)
-          invoiceData.amountTTC = Number.parseFloat(formData.amountTTC.toString())
-        if (formData.vatRate) invoiceData.vatRate = Number.parseFloat(formData.vatRate.toString())
-        if (formData.vatAmount)
-          invoiceData.vatAmount = Number.parseFloat(formData.vatAmount.toString())
-
-        // Dates
-        if (formData.date) {
-          invoiceData.date = DateTime.fromISO(formData.date.toString())
-        }
-        if (formData.dueDate) {
-          invoiceData.dueDate = DateTime.fromISO(formData.dueDate.toString())
-        }
-
-        // Relations
-        if (formData.categoryId)
-          invoiceData.categoryId = Number.parseInt(formData.categoryId.toString())
-        if (formData.vendorId) invoiceData.vendorId = Number.parseInt(formData.vendorId.toString())
-
-        // Créer la facture avec les données camelCase
-        const adaptedStoreData = {
-          number: invoiceData.number,
-          userId: userId.toString(),
-          assignId: userId.toString(), // même utilisateur pour assign
-          documentUrl: invoiceData.documentUrl,
-          originalName: file.clientName,
-          mimeType: file.type,
-          size: file.size,
-          type: 'invoice',
-          status: invoiceData.status,
-          amountHT: invoiceData.amountHT,
-          amountTTC: invoiceData.amountTTC,
-          vatRate: invoiceData.vatRate,
-          vatAmount: invoiceData.vatAmount,
-          notes: invoiceData.notes,
-          date: invoiceData.date,
-          dueDate: invoiceData.dueDate,
-          isDoublon: invoiceData.isDoublon,
-          categoryId: invoiceData.categoryId,
-          vendorId: invoiceData.vendorId,
-        }
-
-        console.log('🔥 CRÉATION STORE:', adaptedStoreData)
-        const invoice = await Invoice.create(adaptedStoreData)
-        console.log('✅ CRÉÉ STORE:', invoice.toJSON())
-
-        logToFile(`Invoice créée avec succès, ID: ${invoice.id}`)
-
-        // Réponse selon le type de requête
-        if (request.header('accept')?.includes('application/json')) {
-          return response.status(201).json({
-            success: true,
-            data: {
-              id: invoice.id,
-              message: 'Facture créée avec succès',
-            },
-          })
-        }
-
-        // Interface web
-        session.flash('success', 'Facture créée avec succès')
-        return response.redirect().toRoute('invoices')
-      } catch (createError) {
-        logToFile(`ERREUR CRÉATION: ${createError}`)
-        throw new Error(`Création échouée: ${createError.message}`)
+      // Préparer les données pour la création
+      // Les données du formulaire ont priorité sur les données IA extraites
+      const invoiceData = {
+        number: formData.number || aiExtractedData.number || null,
+        userId: user.id,
+        assignId: user.id,
+        documentUrl: `storage/invoices/${fileName}`,
+        originalName: document.clientName || '',
+        mimeType: document.type || '',
+        size: document.size || 0,
+        type: document.extname || '',
+        status: (formData.status as 'pending' | 'paid' | 'rejected') || 'pending',
+        amountHT: Number.parseFloat(formData.amountHT) || aiExtractedData.amountHT || 0,
+        amountTTC: Number.parseFloat(formData.amountTTC) || aiExtractedData.amountTTC || 0,
+        vatRate: Number.parseFloat(formData.vatRate) || aiExtractedData.vatRate || 0,
+        vatAmount: Number.parseFloat(formData.vatAmount) || aiExtractedData.vatAmount || 0,
+        notes: formData.notes || null,
+        date: formData.date || aiExtractedData.date || null,
+        dueDate: formData.dueDate || aiExtractedData.dueDate || null,
+        isDoublon: false,
+        categoryId: formData.categoryId ? Number.parseInt(formData.categoryId) : null,
+        vendorId: formData.vendorId ? Number.parseInt(formData.vendorId) : null,
+        bankStatementId: null,
       }
+
+      await this.createInvoiceUseCase.execute(invoiceData)
+
+      // Pour Inertia, retourner une redirection au lieu de JSON
+      return response.redirect('/invoices')
     } catch (error) {
-      logToFile('======= ERREUR PRINCIPALE =======')
-      logToFile(`Type d'erreur: ${error instanceof Error ? 'Error' : typeof error}`)
-      logToFile(`Message: ${error instanceof Error ? error.message : 'Erreur sans message'}`)
+      return response.internalServerError({
+        success: false,
+        message: 'Failed to create invoice',
+        error: error.message,
+      })
+    }
+  }
 
-      if (error instanceof Error && error.stack) {
-        logToFile(`Stack: ${error.stack}`)
+  /**
+   * Update an invoice
+   */
+  async update({ params, request, response }: HttpContext) {
+    try {
+      const data = request.only([
+        'number',
+        'assignId',
+        'documentUrl',
+        'originalName',
+        'mimeType',
+        'size',
+        'type',
+        'status',
+        'amountHT',
+        'amountTTC',
+        'vatRate',
+        'vatAmount',
+        'notes',
+        'date',
+        'dueDate',
+        'isDoublon',
+        'categoryId',
+        'vendorId',
+        'bankStatementId',
+      ])
+
+      await this.updateInvoiceUseCase.execute(params.id, data)
+
+      // Pour Inertia, retourner une redirection au lieu de JSON
+      return response.redirect('/invoices')
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return response.notFound({
+          success: false,
+          message: 'Invoice not found',
+        })
       }
 
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Une erreur est survenue lors de la création de la facture'
-
-      logToFile(`Message d'erreur final: ${errorMessage}`)
-
-      // Récupérer les données minimales pour le formulaire
-      const vendors = await Vendor.all()
-      const categories = await Category.all()
-
-      const vendorsData = vendors.map((vendor) => ({
-        id: vendor.id,
-        name: vendor.name,
-      }))
-
-      const categoriesData = categories.map((category) => ({
-        id: category.id,
-        name: category.name,
-      }))
-
-      logToFile("Préparation de la réponse d'erreur")
-      session.flash('error', errorMessage)
-
-      return inertia.render('invoices/create', {
-        errors: { general: errorMessage },
-        vendors: vendorsData,
-        categories: categoriesData,
-        formData: request.only([
-          'number',
-          'type',
-          'status',
-          'amountHT',
-          'amountTTC',
-          'vatRate',
-          'vatAmount',
-          'notes',
-          'date',
-          'dueDate',
-          'categoryId',
-          'vendorId',
-        ]),
+      return response.internalServerError({
+        success: false,
+        message: 'Failed to update invoice',
+        error: error.message,
       })
-    } finally {
-      logToFile('========= FIN DE LA MÉTHODE STORE =========')
     }
   }
 
-  // Mappage des statuts pour l'interface utilisateur
-  private mapInvoiceStatus(status: string): string {
-    const statusMap: Record<string, string> = {
-      pending: 'pending',
-      paid: 'paid',
-      rejected: 'cancelled',
-    }
+  /**
+   * Delete an invoice
+   */
+  async destroy({ params, response }: HttpContext) {
+    try {
+      await this.deleteInvoiceUseCase.execute(params.id)
 
-    return statusMap[status] || status
+      // Pour Inertia, retourner une redirection au lieu de JSON
+      return response.redirect('/invoices')
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return response.notFound({
+          success: false,
+          message: 'Invoice not found',
+        })
+      }
+
+      return response.internalServerError({
+        success: false,
+        message: 'Failed to delete invoice',
+        error: error.message,
+      })
+    }
   }
 
-  // Analyse préliminaire d'un PDF de facture
+  /**
+   * Analyze PDF invoice with AI to extract data
+   */
   async analyze({ request, response }: HttpContext) {
     try {
-      const { filePath } = request.only(['filePath'])
+      console.log("🔍 ANALYSE: Début de l'analyse")
+      console.log('📁 Files reçus:', request.allFiles())
+      console.log('🔑 OpenAI Key configurée:', process.env.OPENAI_API_KEY ? '✅ OUI' : '❌ NON')
 
-      if (!filePath) {
-        return response.badRequest({ error: 'filePath is required' })
+      // Récupérer le fichier uploadé
+      const document = request.file('document')
+      console.log(
+        '📄 Document:',
+        document ? `${document.clientName} (${document.size} bytes)` : 'AUCUN'
+      )
+
+      if (!document) {
+        console.log('❌ ERREUR: Aucun document reçu')
+        return response.badRequest({
+          success: false,
+          message: "Document requis pour l'analyse",
+        })
       }
 
-      console.log('🔍 Starting AI analysis for:', filePath)
+      // Si pas de clé OpenAI, retourner des données factices pour le test
+      if (!process.env.OPENAI_API_KEY) {
+        console.log('⚠️ OPENAI_API_KEY manquante - Mode test avec données factices')
+        const mockData = {
+          number: 'INV-2024-001',
+          amountHT: 100.0,
+          amountTTC: 120.0,
+          vatRate: 20,
+          vatAmount: 20.0,
+          date: '2024-01-15',
+          dueDate: '2024-02-15',
+        }
 
-      const aiAnalyzer = new PdfAnalyzerService()
-      const result = await aiAnalyzer.analyzePdf(filePath)
-
-      console.log('🤖 AI Analysis result:', result)
-
-      // Adapter les données de l'AI pour le frontend
-      const adaptedData = {
-        number: result.invoiceNumber,
-        amountHT: result.amountHT,
-        amountTTC: result.amountTTC,
-        vatRate: result.vatRate,
-        vatAmount: result.vatAmount,
-        date: result.invoiceDate,
-        dueDate: result.dueDate,
-        vendorId: result.vendorId,
+        return response.ok({
+          success: true,
+          data: {
+            invoiceData: mockData,
+            confidenceScore: 0.8,
+            extractedFields: Object.keys(mockData),
+          },
+          message: 'Analyse terminée avec succès (mode test)',
+        })
       }
 
-      console.log('📊 Adapted data for DB:', adaptedData)
+      // Vérifier que c'est un PDF
+      const isPdf =
+        document.subtype === 'pdf' ||
+        document.extname === 'pdf' ||
+        document.clientName?.toLowerCase().endsWith('.pdf')
 
-      return response.json({
+      if (!isPdf) {
+        console.log('❌ Type de fichier invalide:', {
+          type: document.type,
+          subtype: document.subtype,
+          extname: document.extname,
+          clientName: document.clientName,
+        })
+        return response.badRequest({
+          success: false,
+          message: 'Seuls les fichiers PDF peuvent être analysés',
+        })
+      }
+
+      console.log('✅ Fichier PDF validé:', document.subtype)
+
+      // Sauvegarder temporairement le fichier
+      console.log('💾 Sauvegarde temporaire du fichier...')
+      const tempFileName = `temp_${Date.now()}_${document.clientName}`
+      await document.move('tmp', {
+        name: tempFileName,
+      })
+      console.log('✅ Fichier sauvegardé:', tempFileName)
+
+      // Analyser avec OpenAI
+      console.log("🤖 Début de l'analyse OpenAI...")
+      const filePath = `tmp/${tempFileName}`
+      const analysisResult = await this.aiPdfAnalyzerService.analyzePdf(filePath)
+      console.log('✅ Analyse OpenAI terminée:', analysisResult)
+
+      // Mapper les résultats vers le format attendu par le frontend
+      const invoiceData = this.mapAnalysisToInvoiceData(analysisResult)
+
+      // Calculer un score de confiance basé sur le nombre de champs trouvés
+      const totalFields = 7 // number, amountHT, amountTTC, vatRate, vatAmount, date, dueDate
+      const foundFields = Object.values(invoiceData).filter(
+        (value) => value !== null && value !== ''
+      ).length
+      const confidenceScore = foundFields / totalFields
+
+      // Nettoyer le fichier temporaire
+      try {
+        const fs = await import('node:fs/promises')
+        await fs.unlink(filePath)
+      } catch (cleanupError) {
+        console.warn('Erreur lors du nettoyage du fichier temporaire:', cleanupError)
+      }
+
+      return response.ok({
         success: true,
-        data: adaptedData,
-        originalResult: result,
+        data: {
+          invoiceData,
+          confidenceScore,
+          extractedFields: Object.keys(invoiceData).filter(
+            (key) => invoiceData[key] !== null && invoiceData[key] !== ''
+          ),
+        },
+        message: 'Analyse terminée avec succès',
       })
     } catch (error) {
-      console.error('💥 AI Analysis error:', error)
+      console.log('❌ ERREUR ANALYSE:', error)
       return response.internalServerError({
-        error: 'Analysis failed',
-        details: error.message,
+        success: false,
+        message: "Erreur lors de l'analyse du document",
+        error: error.message,
       })
     }
+  }
+
+  /**
+   * Map AI analysis results to invoice data format expected by frontend
+   */
+  private mapAnalysisToInvoiceData(analysisResult: any): any {
+    return {
+      number: analysisResult.invoiceNumber || null,
+      amountHT: analysisResult.amountHT || null,
+      amountTTC: analysisResult.amountTTC || null,
+      vatRate: analysisResult.vatRate || null,
+      vatAmount: analysisResult.vatAmount || null,
+      date: this.formatDateForFrontend(analysisResult.invoiceDate) || null,
+      dueDate: this.formatDateForFrontend(analysisResult.dueDate) || null,
+    }
+  }
+
+  /**
+   * Convert DD/MM/YYYY to YYYY-MM-DD for HTML date inputs
+   */
+  private formatDateForFrontend(dateString: string | null): string | null {
+    if (!dateString) return null
+
+    // Si déjà au format YYYY-MM-DD
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateString
+    }
+
+    // Si au format DD/MM/YYYY
+    if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [day, month, year] = dateString.split('/')
+      return `${year}-${month}-${day}`
+    }
+
+    return null
   }
 }

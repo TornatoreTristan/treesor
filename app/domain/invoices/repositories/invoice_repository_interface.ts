@@ -1,9 +1,55 @@
-import { InvoiceEntity } from '#entities/invoice_entity'
+import { InvoiceEntity } from '../entities/invoice_entity.js'
+
+export interface CreateInvoiceData {
+  number?: string | null
+  userId: string
+  assignId: string
+  documentUrl: string
+  originalName: string
+  mimeType: string
+  size: number
+  type: string
+  status: 'pending' | 'paid' | 'rejected'
+  amountHT: number
+  amountTTC: number
+  vatRate: number
+  vatAmount: number
+  notes?: string | null
+  date?: string | null
+  dueDate?: string | null
+  isDoublon?: boolean
+  categoryId?: number | null
+  vendorId?: number | null
+  bankStatementId?: number | null
+}
+
+export interface UpdateInvoiceData {
+  number?: string | null
+  assignId?: string
+  documentUrl?: string
+  originalName?: string
+  mimeType?: string
+  size?: number
+  type?: string
+  status?: 'pending' | 'paid' | 'rejected'
+  amountHT?: number
+  amountTTC?: number
+  vatRate?: number
+  vatAmount?: number
+  notes?: string | null
+  date?: string | null
+  dueDate?: string | null
+  isDoublon?: boolean
+  categoryId?: number | null
+  vendorId?: number | null
+  bankStatementId?: number | null
+}
 
 export interface InvoiceRepositoryInterface {
-  findAll(): Promise<InvoiceEntity[]>
   findById(id: number): Promise<InvoiceEntity | null>
-  create(invoice: InvoiceEntity): Promise<InvoiceEntity>
-  update(id: number, invoice: Partial<InvoiceEntity>): Promise<InvoiceEntity>
+  findAll(): Promise<InvoiceEntity[]>
+  findByUserId(userId: string): Promise<InvoiceEntity[]>
+  create(data: CreateInvoiceData): Promise<InvoiceEntity>
+  update(id: number, data: UpdateInvoiceData): Promise<InvoiceEntity>
   delete(id: number): Promise<void>
 }

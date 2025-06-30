@@ -38,16 +38,16 @@ export default class Invoice extends BaseModel {
   @column()
   declare status: 'pending' | 'paid' | 'rejected'
 
-  @column({ columnName: 'amount_ht' })
+  @column({ columnName: 'amountHT' })
   declare amountHT: number
 
-  @column({ columnName: 'amount_ttc' })
+  @column({ columnName: 'amountTTC' })
   declare amountTTC: number
 
-  @column({ columnName: 'vat_rate' })
+  @column({ columnName: 'vatRate' })
   declare vatRate: number
 
-  @column({ columnName: 'vat_amount' })
+  @column({ columnName: 'vatAmount' })
   declare vatAmount: number
 
   @column()
