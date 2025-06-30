@@ -114,11 +114,35 @@ export const columns: ColumnDef<Invoice>[] = [
     cell: ({ row }) => <div>{row.getValue('clientName')}</div>,
   },
   {
-    accessorKey: 'category',
-    header: 'Catégorie',
-    cell: ({ row }) => <div>{row.getValue('category') || '-'}</div>,
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
+    accessorKey: 'createdBy',
+    header: 'Créé par',
+    cell: ({ row }) => {
+      const createdBy = row.getValue('createdBy') as Invoice['createdBy']
+
+      if (!createdBy) {
+        return <div className="text-gray-400">-</div>
+      }
+
+      const displayName =
+        createdBy.fullName ||
+        `${createdBy.firstName || ''} ${createdBy.lastName || ''}`.trim() ||
+        createdBy.email
+
+      return (
+        <div className="flex items-center space-x-2">
+          {createdBy.avatar ? (
+            <img
+              src={createdBy.avatar}
+              alt={displayName}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+      )
     },
   },
   {
@@ -163,11 +187,6 @@ export const columns: ColumnDef<Invoice>[] = [
     accessorKey: 'paymentDate',
     header: 'Date de paiement',
     cell: ({ row }) => <div>{formatDate(row.getValue('paymentDate'))}</div>,
-  },
-  {
-    accessorKey: 'description',
-    header: 'Description',
-    cell: ({ row }) => <div className="line-clamp-1">{row.getValue('description') || '-'}</div>,
   },
   {
     id: 'actions',

@@ -46,7 +46,7 @@ export default function InvoicesPage({ invoices }: InvoicesPageProps) {
             </Button>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-8 text-xs">
             <DataTable
               columns={columns}
               data={invoices}

@@ -7,6 +7,7 @@ import { UpdateInvoiceUseCase } from '#domain/invoices/use_cases/update_invoice_
 import { DeleteInvoiceUseCase } from '#domain/invoices/use_cases/delete_invoice_use_case'
 import { InvoiceRepository } from '../../infrastructure/repositories/invoice_repository.js'
 import { AiPdfAnalyzerService } from '../../infrastructure/services/ai_pdf_analyzer_service.js'
+import User from '#models/user'
 
 export default class InvoicesController {
   private invoiceRepository: InvoiceRepository
@@ -35,24 +36,47 @@ export default class InvoicesController {
       const user = auth.user!
       const invoiceEntities = await this.fetchAllInvoicesUseCase.execute(user.id)
 
+      // Récupérer tous les userId uniques des factures
+      const userIds = [...new Set(invoiceEntities.map((entity) => entity.userId))]
+
+      // Récupérer les utilisateurs correspondants
+      const users = await User.query().whereIn('id', userIds)
+
+      // Créer un map pour un accès rapide aux utilisateurs
+      const userMap = new Map(users.map((u) => [u.id, u]))
+
       // Mapper les entités vers le format attendu par le frontend
-      const invoices = invoiceEntities.map((entity) => ({
-        id: entity.id!,
-        invoiceNumber: entity.number || `INV-${entity.id}`,
-        date: this.formatDate(entity.date) || this.formatDate(entity.createdAt) || '',
-        dueDate: this.formatDate(entity.dueDate) || '',
-        clientName: entity.vendor?.name || `Vendor ${entity.vendorId || 'Unknown'}`,
-        amount: entity.amountHT,
-        vatRate: entity.vatRate,
-        vatAmount: entity.vatAmount,
-        totalAmount: entity.amountTTC,
-        status: this.mapStatus(entity.status),
-        description: entity.type,
-        notes: entity.notes || '',
-        createdAt: this.formatDateTime(entity.createdAt) || '',
-        updatedAt: this.formatDateTime(entity.updatedAt) || '',
-        category: entity.category?.name || '',
-      }))
+      const invoices = invoiceEntities.map((entity) => {
+        const createdByUser = userMap.get(entity.userId)
+
+        return {
+          id: entity.id!,
+          invoiceNumber: entity.number || `INV-${entity.id}`,
+          date: this.formatDate(entity.date) || this.formatDate(entity.createdAt) || '',
+          dueDate: this.formatDate(entity.dueDate) || '',
+          clientName: entity.vendor?.name || `Vendor ${entity.vendorId || 'Unknown'}`,
+          amount: entity.amountHT,
+          vatRate: entity.vatRate,
+          vatAmount: entity.vatAmount,
+          totalAmount: entity.amountTTC,
+          status: this.mapStatus(entity.status),
+          description: entity.type,
+          notes: entity.notes || '',
+          createdAt: this.formatDateTime(entity.createdAt) || '',
+          updatedAt: this.formatDateTime(entity.updatedAt) || '',
+          category: entity.category?.name || '',
+          createdBy: createdByUser
+            ? {
+                id: createdByUser.id,
+                fullName: createdByUser.fullName,
+                firstName: createdByUser.firstName,
+                lastName: createdByUser.lastName,
+                avatar: createdByUser.avatar,
+                email: createdByUser.email,
+              }
+            : null,
+        }
+      })
 
       return inertia.render('invoices/index', {
         invoices,

@@ -1,4 +1,8 @@
-import { InvoiceRepositoryInterface, CreateInvoiceData, UpdateInvoiceData } from '#domain/invoices/repositories/invoice_repository_interface'
+import {
+  InvoiceRepositoryInterface,
+  CreateInvoiceData,
+  UpdateInvoiceData,
+} from '#domain/invoices/repositories/invoice_repository_interface'
 import { InvoiceEntity } from '#domain/invoices/entities/invoice_entity'
 import Invoice from '#models/invoice'
 import { DateTime } from 'luxon'
@@ -17,14 +21,13 @@ export class InvoiceRepository implements InvoiceRepositoryInterface {
   async findAll(): Promise<InvoiceEntity[]> {
     const invoices = await Invoice.all()
 
-    return invoices.map(invoice => this.toEntity(invoice))
+    return invoices.map((invoice) => this.toEntity(invoice))
   }
 
   async findByUserId(userId: string): Promise<InvoiceEntity[]> {
-    const invoices = await Invoice.query()
-      .where('userId', userId)
+    const invoices = await Invoice.query().where('userId', userId)
 
-    return invoices.map(invoice => this.toEntity(invoice))
+    return invoices.map((invoice) => this.toEntity(invoice))
   }
 
   async create(data: CreateInvoiceData): Promise<InvoiceEntity> {
@@ -56,7 +59,7 @@ export class InvoiceRepository implements InvoiceRepositoryInterface {
 
   async update(id: number, data: UpdateInvoiceData): Promise<InvoiceEntity> {
     const invoice = await Invoice.findOrFail(id)
-    
+
     // Mapper explicitement les propriétés pour éviter les problèmes de noms
     const updateData: any = {}
     if (data.number !== undefined) updateData.number = data.number
@@ -73,7 +76,8 @@ export class InvoiceRepository implements InvoiceRepositoryInterface {
     if (data.vatAmount !== undefined) updateData.vatAmount = data.vatAmount
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.date !== undefined) updateData.date = data.date ? DateTime.fromISO(data.date) : null
-    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? DateTime.fromISO(data.dueDate) : null
+    if (data.dueDate !== undefined)
+      updateData.dueDate = data.dueDate ? DateTime.fromISO(data.dueDate) : null
     if (data.isDoublon !== undefined) updateData.isDoublon = data.isDoublon
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
     if (data.vendorId !== undefined) updateData.vendorId = data.vendorId
@@ -114,7 +118,7 @@ export class InvoiceRepository implements InvoiceRepositoryInterface {
       vendorId: invoice.vendorId,
       bankStatementId: invoice.bankStatementId,
       category: null, // Relations désactivées pour simplifier
-      vendor: null,   // Relations désactivées pour simplifier
+      vendor: null, // Relations désactivées pour simplifier
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,
     }

@@ -20,6 +20,14 @@ export interface Invoice {
   updatedAt: string
   category?: string // Catégorie de dépense
   accountingCode?: string // Code comptable
+  createdBy?: {
+    id: string
+    fullName: string | null
+    firstName: string | null
+    lastName: string | null
+    avatar: string | null
+    email: string
+  } | null
 }
 
 // Types pour la requête de création d'une facture fournisseur
