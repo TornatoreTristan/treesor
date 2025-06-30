@@ -21,6 +21,7 @@ router
     router.get('/categories', [CategoriesController, 'show'])
     router.get('/invoices', [InvoicesController, 'index'])
     router.get('/invoices/create', [InvoicesController, 'create'])
+    router.get('/invoices/:id/view', [InvoicesController, 'viewPdf'])
     router.get('/invoices/:id/edit', [InvoicesController, 'edit'])
     router.get('/justificatifs', [JustificatifsController, 'show'])
   })

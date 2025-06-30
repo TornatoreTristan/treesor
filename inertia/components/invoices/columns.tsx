@@ -1,5 +1,5 @@
 import { ColumnDef } from '@tanstack/react-table'
-import { ArrowUpDown, Edit, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Edit, Trash2, Eye } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { Invoice, InvoiceStatus } from '~/types/invoice'
 import { Link, router } from '@inertiajs/react'
@@ -177,6 +177,14 @@ export const columns: ColumnDef<Invoice>[] = [
 
       return (
         <div className="text-right space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(`/invoices/${invoice.id}/view`, '_blank')}
+          >
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">Voir le PDF</span>
+          </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href={`/invoices/${invoice.id}/edit`}>
               <Edit className="h-4 w-4" />

@@ -156,6 +156,39 @@ export default class InvoicesController {
   }
 
   /**
+   * View PDF file
+   */
+  async viewPdf({ params, response }: HttpContext) {
+    try {
+      const invoice = await this.fetchInvoiceUseCase.execute(params.id)
+      console.log('📄 Invoice documentUrl:', invoice.documentUrl)
+
+      // Construire le chemin absolu vers le fichier PDF
+      const filePath = invoice.documentUrl
+      console.log('📂 Chemin fichier:', filePath)
+
+      // Vérifier si le fichier existe
+      const fs = await import('node:fs')
+      if (!fs.existsSync(filePath)) {
+        console.log('❌ Fichier introuvable:', filePath)
+        return response.notFound('Fichier PDF introuvable')
+      }
+
+      // Configurer les headers et servir le fichier
+      response.type('application/pdf')
+      response.header('Content-Disposition', 'inline')
+      return response.stream(fs.createReadStream(filePath))
+    } catch (error) {
+      console.log('❌ Erreur PDF:', error)
+      if (error.message.includes('not found')) {
+        return response.notFound('Facture introuvable')
+      }
+
+      return response.internalServerError('Erreur lors du chargement du PDF')
+    }
+  }
+
+  /**
    * Get a single invoice
    */
   async show({ params, response }: HttpContext) {
