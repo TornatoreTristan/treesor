@@ -8,3 +8,6 @@ router.get('/login', [LoginController, 'show'])
 // Routes pour l'authentification Google
 router.get('/auth/google', [LoginController, 'googleRedirect'])
 router.get('/auth/google/callback', [LoginController, 'googleCallback'])
+
+// Route de logout
+router.post('/logout', [LoginController, 'logout'])

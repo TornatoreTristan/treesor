@@ -13,4 +13,9 @@ export default class LoginController {
   async googleCallback(ctx: HttpContext) {
     return new AuthGoogleService().callback(ctx)
   }
+
+  async logout({ auth, response }: HttpContext) {
+    await auth.use('web').logout()
+    return response.redirect('/login')
+  }
 }

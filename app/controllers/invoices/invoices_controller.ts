@@ -33,8 +33,8 @@ export default class InvoicesController {
    */
   async index({ inertia, auth }: HttpContext) {
     try {
-      const user = auth.user!
-      const invoiceEntities = await this.fetchAllInvoicesUseCase.execute(user.id)
+      auth.user!
+      const invoiceEntities = await this.fetchAllInvoicesUseCase.execute()
 
       // Récupérer tous les userId uniques des factures
       const userIds = [...new Set(invoiceEntities.map((entity) => entity.userId))]

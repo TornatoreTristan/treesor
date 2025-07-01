@@ -61,13 +61,13 @@ const Transactions = ({ transactions, categories }: Props) => {
   return (
     <DefaultLayout>
       <HeaderPage title="Transactions" />
-      <button
+      {/* <button
         className="mb-4 px-4 py-2 bg-blue-600 text-white rounded"
         onClick={handleAutoCategorize}
         disabled={loading}
       >
         {loading ? 'Catégorisation en cours...' : 'Catégoriser automatiquement'}
-      </button>
+      </button> */}
       <TransactionsTable
         transactions={transactions}
         categories={categories}

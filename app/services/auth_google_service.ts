@@ -28,8 +28,18 @@ export class AuthGoogleService {
         fullName: googleUser.name ?? googleUser.nickName,
         googleAccessToken: googleUser.token.token,
         googleId: googleUser.id,
+        avatar: googleUser.avatarUrl,
         googleRefreshToken: googleUser.token.refreshToken,
       })
+    } else {
+      // Mettre à jour les informations de l'utilisateur existant à chaque connexion
+      user.merge({
+        fullName: googleUser.name ?? googleUser.nickName,
+        avatar: googleUser.avatarUrl,
+        googleAccessToken: googleUser.token.token,
+        googleRefreshToken: googleUser.token.refreshToken,
+      })
+      await user.save()
     }
 
     // Connexion de l'utilisateur avec le service de session
